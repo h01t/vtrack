@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import supervision as sv
 
-from vtrack.config import VEHICLE_NAMES
+from vtrack.config import COCO_VEHICLE_NAMES
 
 
 @dataclass
@@ -21,6 +21,7 @@ class TrackRecord:
     first_frame: int
     last_frame: int
     positions: list = field(default_factory=list)
+    class_names: dict = field(default_factory=lambda: COCO_VEHICLE_NAMES)
 
     @property
     def duration_frames(self) -> int:
@@ -28,7 +29,7 @@ class TrackRecord:
 
     @property
     def class_name(self) -> str:
-        return VEHICLE_NAMES.get(self.class_id, f"cls_{self.class_id}")
+        return self.class_names.get(self.class_id, f"cls_{self.class_id}")
 
 
 class VehicleAnalytics:
@@ -38,7 +39,9 @@ class VehicleAnalytics:
         self,
         line_zone: sv.LineZone | None = None,
         polygon_zone: sv.PolygonZone | None = None,
+        class_names: dict[int, str] | None = None,
     ):
+        self.class_names = class_names or COCO_VEHICLE_NAMES
         self.line_zone = line_zone
         self.polygon_zone = polygon_zone
 
@@ -74,6 +77,7 @@ class VehicleAnalytics:
                         class_id=cls_id,
                         first_frame=self.frame_count,
                         last_frame=self.frame_count,
+                        class_names=self.class_names,
                     )
                     self.class_counts[cls_id] += 1
 
@@ -107,7 +111,7 @@ class VehicleAnalytics:
         durations = [t.duration_frames for t in self.tracks.values()]
         per_class = {}
         for cls_id, count in self.class_counts.items():
-            name = VEHICLE_NAMES.get(cls_id, f"cls_{cls_id}")
+            name = self.class_names.get(cls_id, f"cls_{cls_id}")
             per_class[name] = count
 
         return {
@@ -132,7 +136,7 @@ class VehicleAnalytics:
 
         # Per-class breakdown
         for cls_id, count in sorted(self.class_counts.items()):
-            name = VEHICLE_NAMES.get(cls_id, f"cls_{cls_id}")
+            name = self.class_names.get(cls_id, f"cls_{cls_id}")
             panel_lines.append(f"  {name}: {count}")
 
         if self.line_zone is not None:

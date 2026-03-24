@@ -28,7 +28,7 @@ ssh "$REMOTE" "$REMOTE_VENV && cd $REMOTE_DIR && python3 scripts/train.py \
 echo ""
 echo "=== Pulling trained weights back ==="
 mkdir -p "$(dirname "$0")/../models"
-rsync -avz "$REMOTE:$REMOTE_DIR/outputs/training/vehicle_v1/weights/" \
+rsync -avz "$REMOTE:$REMOTE_DIR/runs/detect/outputs/training/vehicle_v1/weights/" \
     "$(dirname "$0")/../models/"
 
 echo ""

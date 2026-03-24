@@ -26,8 +26,11 @@ class VehiclePipeline:
             confidence=confidence,
             tracker=tracker,
         )
-        self.visualizer = Visualizer(trace_length=trace_length)
+        class_names = self.tracker.class_names
+        self.visualizer = Visualizer(trace_length=trace_length, class_names=class_names)
         self.analytics = analytics
+        if self.analytics:
+            self.analytics.class_names = class_names
 
     def run(
         self,

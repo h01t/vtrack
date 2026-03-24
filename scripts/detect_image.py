@@ -6,7 +6,6 @@ from pathlib import Path
 # Add src to path so vtrack is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from vtrack.config import VEHICLE_NAMES
 from vtrack.detect import VehicleDetector
 
 
@@ -22,7 +21,7 @@ def main():
         for box in boxes:
             cls_id = int(box.cls[0])
             conf = float(box.conf[0])
-            name = VEHICLE_NAMES.get(cls_id, f"class_{cls_id}")
+            name = detector.class_names.get(cls_id, f"class_{cls_id}")
             print(f"  - {name}: {conf:.2f}")
 
         # Show the annotated image

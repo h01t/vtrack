@@ -6,13 +6,14 @@ import cv2
 import numpy as np
 import supervision as sv
 
-from vtrack.config import VEHICLE_NAMES
+from vtrack.config import COCO_VEHICLE_NAMES
 
 
 class Visualizer:
     """Draw bounding boxes, track IDs, trails, and FPS on video frames."""
 
-    def __init__(self, trace_length: int = 30):
+    def __init__(self, trace_length: int = 30, class_names: dict[int, str] | None = None):
+        self.class_names = class_names or COCO_VEHICLE_NAMES
         self.box_annotator = sv.BoxAnnotator(thickness=2)
         self.label_annotator = sv.LabelAnnotator(text_scale=0.5, text_padding=5)
         self.trace_annotator = sv.TraceAnnotator(
@@ -61,7 +62,7 @@ class Visualizer:
             conf = float(detections.confidence[i]) if detections.confidence is not None else 0.0
             track_id = int(detections.tracker_id[i]) if detections.tracker_id is not None else -1
 
-            name = VEHICLE_NAMES.get(cls_id, f"cls_{cls_id}")
+            name = self.class_names.get(cls_id, f"cls_{cls_id}")
             if track_id >= 0:
                 labels.append(f"{name} #{track_id} {conf:.2f}")
             else:

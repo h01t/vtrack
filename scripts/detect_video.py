@@ -7,7 +7,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from vtrack.detect import VehicleDetector
-from vtrack.config import VEHICLE_NAMES
 
 
 def main():

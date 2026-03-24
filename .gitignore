@@ -25,6 +25,9 @@ dist/
 .vscode/
 .idea/
 
+# Reference docs (portable to other projects)
+PLATFORM.md
+
 # Ultralytics
 runs/
 *.pt
