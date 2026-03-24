@@ -30,6 +30,8 @@ dist/
 
 # Reference docs (portable to other projects)
 PLATFORM.md
+CLAUDE.md
+IDEA.md
 
 # Ultralytics
 runs/
