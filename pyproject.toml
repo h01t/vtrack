@@ -1,0 +1,30 @@
+[project]
+name = "vtrack"
+version = "0.1.0"
+description = "Vehicle detection and tracking pipeline using YOLOv11"
+requires-python = ">=3.12"
+dependencies = [
+    "ultralytics>=8.3",
+    "opencv-python>=4.10",
+    "numpy>=1.26",
+    "supervision>=0.25",
+    "lapx>=0.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.9",
+    "ipython>=8.0",
+]
+export = [
+    "onnx>=1.16",
+    "onnxruntime>=1.18",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
