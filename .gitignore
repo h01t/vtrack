@@ -7,6 +7,9 @@ models/*.pt
 models/*.onnx
 models/*.mlmodel
 
+# Session transcript
+2026-03-24-235729-this-session-is-being-continued-from-a-previous-co.txt
+
 # Outputs
 outputs/
 
