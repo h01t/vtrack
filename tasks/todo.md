@@ -14,40 +14,38 @@
 - [x] Initial git commit
 
 ## Phase 2: Dataset + Fine-Tuning
-- [ ] Choose and download vehicle dataset (UA-DETRAC / Roboflow / COCO subset)
-- [ ] Convert to YOLO format if needed
-- [ ] Create configs/dataset.yaml
-- [ ] Baseline metrics with pretrained YOLOv11n
-- [ ] Create scripts/train.py
-- [ ] Fine-tune YOLOv11n (device=mps, 50 epochs)
-- [ ] Create scripts/evaluate.py
-- [ ] Evaluate: target mAP@0.5 >= 0.7
-- [ ] Save best weights to models/
+- [x] Choose and download vehicle dataset → KITTI (auto-download via Ultralytics, 390MB)
+- [x] Baseline metrics with pretrained YOLOv11n (mAP@0.5: 0.022 — expected, COCO/KITTI class mismatch)
+- [x] Create scripts/train.py + scripts/evaluate.py
+- [x] Fix SSH key auth to CUDA workstation (blackbox, 192.168.1.100)
+- [x] Set up remote CUDA training (3060 Ti, scripts/train_remote.sh)
+- [ ] Fine-tune YOLOv11n on KITTI (50 epochs, CUDA) — **IN PROGRESS: epoch ~27/50, mAP@0.5 = 0.779**
+- [ ] Pull trained weights to models/ and run final evaluation
 
 ## Phase 3: Multi-Object Tracking
-- [ ] Create src/vtrack/track.py (VehicleTracker with ByteTrack)
-- [ ] Create configs/bytetrack.yaml with tuned params
-- [ ] Create src/vtrack/visualize.py (boxes, IDs, trails, FPS)
-- [ ] Create scripts/detect_video.py
-- [ ] Test on sample traffic video
-- [ ] Verify persistent track IDs across frames
-- [ ] Tune track_buffer for occlusion handling
+- [x] Create src/vtrack/track.py (VehicleTracker with ByteTrack via Ultralytics model.track())
+- [x] Create src/vtrack/visualize.py (boxes, IDs, trails, FPS counter via supervision)
+- [x] Create scripts/detect_video.py
+- [x] Test on KITTI clip — 18 unique vehicle tracks across 150 frames
+- [x] Verify persistent track IDs across frames
+- [ ] Tune track_buffer for occlusion handling (needs real continuous video)
 
 ## Phase 4: Real-Time Inference Pipeline
-- [ ] Create src/vtrack/pipeline.py (orchestrator)
-- [ ] Support video files, webcam, RTSP, YouTube
-- [ ] Create scripts/demo.py (CLI with argparse)
-- [ ] FPS benchmarks (YOLOv11n, YOLOv11s on M4 Pro)
-- [ ] Save annotated output video
+- [x] Create src/vtrack/pipeline.py (orchestrator)
+- [x] Support video files, webcam, RTSP, YouTube
+- [x] Create scripts/demo.py (CLI with argparse)
+- [x] Save annotated output video
+- [ ] FPS benchmarks (YOLOv11n, YOLOv11s on M4 Pro) — needs real video
 
 ## Phase 5: Analytics Layer
-- [ ] Create src/vtrack/analytics.py
-- [ ] Line-crossing counter (supervision.LineZone)
-- [ ] Polygon zone monitoring (supervision.PolygonZone)
-- [ ] Per-class vehicle counts
-- [ ] Track duration stats
-- [ ] Export to CSV/JSON
-- [ ] Analytics overlay on video
+- [x] Create src/vtrack/analytics.py
+- [x] Line-crossing counter (supervision.LineZone)
+- [x] Polygon zone monitoring (supervision.PolygonZone)
+- [x] Per-class vehicle counts
+- [x] Track duration stats
+- [x] Export to CSV/JSON
+- [x] Analytics overlay on video
+- [x] Integrate analytics into pipeline and demo CLI
 
 ## Phase 6: Edge Deployment (Future)
 - [ ] Export to ONNX
