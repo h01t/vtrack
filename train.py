@@ -30,9 +30,9 @@ def main():
     # --- Hyperparameters (AutoTrain agent modifies these) ---
     results = model.train(
         data=data_path,
-        epochs=1,
+        epochs=10,
         imgsz=320,
-        batch=2,
+        batch=8,
         device="cuda",
         project="outputs/training",
         name="autotrain",
@@ -40,7 +40,7 @@ def main():
         pretrained=True,
         lr0=0.001,
         verbose=True,
-        workers=0,
+        workers=4,
     )
 
     # Print metrics as JSON for AutoTrain extraction
