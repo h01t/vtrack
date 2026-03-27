@@ -30,7 +30,7 @@ def main():
     # --- Hyperparameters (AutoTrain agent modifies these) ---
     results = model.train(
         data=data_path,
-        epochs=10,
+        epochs=1,
         imgsz=320,
         batch=2,
         device="cuda",
