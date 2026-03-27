@@ -22,9 +22,9 @@ def main():
     # --- Hyperparameters (AutoTrain agent modifies these) ---
     results = model.train(
         data="datasets/kitti/kitti.yaml",
-        epochs=50,
+        epochs=10,
         imgsz=640,
-        batch=8,
+        batch=4,
         device="cuda",
         project="outputs/training",
         name="autotrain",
