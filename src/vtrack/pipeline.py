@@ -3,9 +3,10 @@
 from pathlib import Path
 
 import cv2
+import supervision as sv
 
 from vtrack.analytics import VehicleAnalytics
-from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL
+from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL, DEFAULT_TRACKER
 from vtrack.track import VehicleTracker
 from vtrack.visualize import Visualizer, ultralytics_to_detections
 
@@ -17,7 +18,7 @@ class VehiclePipeline:
         self,
         model_path: str = DEFAULT_MODEL,
         confidence: float = DEFAULT_CONFIDENCE,
-        tracker: str = "bytetrack.yaml",
+        tracker: str = DEFAULT_TRACKER,
         trace_length: int = 30,
         analytics: VehicleAnalytics | None = None,
     ):
@@ -29,8 +30,18 @@ class VehiclePipeline:
         class_names = self.tracker.class_names
         self.visualizer = Visualizer(trace_length=trace_length, class_names=class_names)
         self.analytics = analytics
+        self.line_zone_annotator = None
+        self.polygon_zone_annotator = None
         if self.analytics:
             self.analytics.class_names = class_names
+            if self.analytics.line_zone is not None:
+                self.line_zone_annotator = sv.LineZoneAnnotator(thickness=2, text_scale=0.5)
+            if self.analytics.polygon_zone is not None:
+                self.polygon_zone_annotator = sv.PolygonZoneAnnotator(
+                    zone=self.analytics.polygon_zone,
+                    thickness=2,
+                    text_scale=0.5,
+                )
 
     def run(
         self,
@@ -68,12 +79,13 @@ class VehiclePipeline:
                 if self.analytics:
                     annotated = self.analytics.annotate(annotated)
 
-                    # Draw line/zone annotations if present
-                    if self.analytics.line_zone is not None:
-                        line_annotator = cv2.LINE_AA  # placeholder — use sv annotator
-                        from supervision import LineZoneAnnotator
-                        lza = LineZoneAnnotator(thickness=2, text_scale=0.5)
-                        annotated = lza.annotate(annotated, self.analytics.line_zone)
+                    if self.line_zone_annotator is not None:
+                        annotated = self.line_zone_annotator.annotate(
+                            annotated,
+                            self.analytics.line_zone,
+                        )
+                    if self.polygon_zone_annotator is not None:
+                        annotated = self.polygon_zone_annotator.annotate(annotated)
 
                 frame_count += 1
 
@@ -105,12 +117,16 @@ class VehiclePipeline:
         # Export analytics
         if self.analytics:
             summary = self.analytics.get_summary()
-            print(f"\n--- Analytics Summary ---")
+            print("\n--- Analytics Summary ---")
             print(f"Unique vehicles: {summary['unique_vehicles']}")
             for cls_name, count in summary['per_class_counts'].items():
                 print(f"  {cls_name}: {count}")
             if summary['line_crossings_in'] or summary['line_crossings_out']:
-                print(f"Line crossings — In: {summary['line_crossings_in']}, Out: {summary['line_crossings_out']}")
+                print(
+                    "Line crossings — "
+                    f"In: {summary['line_crossings_in']}, "
+                    f"Out: {summary['line_crossings_out']}"
+                )
             print(f"Avg track duration: {summary['avg_track_duration_frames']:.1f} frames")
 
             if export_csv:

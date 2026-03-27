@@ -1,11 +1,12 @@
 """Vehicle analytics: counting, zone monitoring, track statistics."""
 
-import json
 import csv
-from collections import Counter, defaultdict
+import json
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import cv2
 import numpy as np
 import supervision as sv
 
@@ -88,7 +89,7 @@ class VehicleAnalytics:
         # Line crossing (requires tracker_id)
         has_tracks = detections.tracker_id is not None and len(detections) > 0
         if self.line_zone is not None and has_tracks:
-            crossed_in, crossed_out = self.line_zone.trigger(detections)
+            self.line_zone.trigger(detections)
             self.line_in_count = self.line_zone.in_count
             self.line_out_count = self.line_zone.out_count
 
@@ -158,7 +159,15 @@ class VehicleAnalytics:
 
         for i, line in enumerate(panel_lines):
             y = y0 + 20 + i * line_height
-            cv2.putText(frame, line, (x0 + 10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.putText(
+                frame,
+                line,
+                (x0 + 10, y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                1,
+            )
 
         return frame
 
@@ -167,8 +176,11 @@ class VehicleAnalytics:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["frame", "detections", "line_in", "line_out", "zone_count"])
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=["frame", "detections", "line_in", "line_out", "zone_count"],
+            )
             writer.writeheader()
             writer.writerows(self.frame_log)
         print(f"Frame data exported to {path}")
@@ -190,10 +202,6 @@ class VehicleAnalytics:
             for t in self.tracks.values()
         ]
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         print(f"Summary exported to {path}")
-
-
-# Need cv2 for annotate method
-import cv2

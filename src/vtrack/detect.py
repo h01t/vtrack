@@ -4,7 +4,8 @@ from pathlib import Path
 
 from ultralytics import YOLO
 
-from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL, get_class_config
+from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL
+from vtrack.model_profiles import resolve_model_profile
 
 
 class VehicleDetector:
@@ -17,7 +18,9 @@ class VehicleDetector:
     ):
         self.model = YOLO(model_path)
         self.confidence = confidence
-        self.vehicle_classes, self.class_names = get_class_config(model_path)
+        self.profile = resolve_model_profile(self.model, source=model_path)
+        self.vehicle_classes = self.profile.class_filter
+        self.class_names = self.profile.class_names
 
     def detect_image(self, source: str | Path, save: bool = True):
         """Run detection on a single image."""

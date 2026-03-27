@@ -27,21 +27,10 @@ KITTI_NAMES = {
 
 # Default model
 DEFAULT_MODEL = "yolo11n.pt"
+DEFAULT_TRACKER = "bytetrack.yaml"
+DEFAULT_DATASET = "kitti.yaml"
 
 # Detection defaults
 DEFAULT_CONFIDENCE = 0.25
 DEFAULT_IOU = 0.45
 DEFAULT_IMGSZ = 640
-
-
-def get_class_config(model_path: str) -> tuple[list[int] | None, dict[int, str]]:
-    """Return (class_filter, class_names) based on model type.
-
-    For KITTI-trained models: no class filter (all classes are relevant), KITTI names.
-    For COCO pretrained: filter to vehicle classes only.
-    """
-    if "best" in model_path or "last" in model_path or "vehicle" in model_path:
-        # Fine-tuned model — all classes are vehicle-related, no filter needed
-        return None, KITTI_NAMES
-    # Pretrained COCO model — filter to vehicle classes
-    return COCO_VEHICLE_CLASSES, COCO_VEHICLE_NAMES

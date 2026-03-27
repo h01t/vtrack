@@ -4,7 +4,8 @@ from pathlib import Path
 
 from ultralytics import YOLO
 
-from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL, get_class_config
+from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL, DEFAULT_TRACKER
+from vtrack.model_profiles import resolve_model_profile
 
 
 class VehicleTracker:
@@ -14,11 +15,13 @@ class VehicleTracker:
         self,
         model_path: str = DEFAULT_MODEL,
         confidence: float = DEFAULT_CONFIDENCE,
-        tracker: str = "bytetrack.yaml",
+        tracker: str = DEFAULT_TRACKER,
     ):
         self.model = YOLO(model_path)
         self.confidence = confidence
-        self.vehicle_classes, self.class_names = get_class_config(model_path)
+        self.profile = resolve_model_profile(self.model, source=model_path)
+        self.vehicle_classes = self.profile.class_filter
+        self.class_names = self.profile.class_names
         self.tracker_config = tracker
 
     def track(self, source: str | Path | int, stream: bool = True):

@@ -55,29 +55,23 @@ The pretrained COCO model scored mAP@0.5 of 0.022 on KITTI due to class ID misma
 
 ```
 object-det/
-├── src/vtrack/              # Core library
-│   ├── config.py            # Model/class configuration (COCO + KITTI)
+├── src/vtrack/              # Installable package
+│   ├── cli.py               # Unified `vtrack` CLI
+│   ├── settings.py          # Typed settings + canonical path layout
+│   ├── model_profiles.py    # Checkpoint metadata / class profile resolution
+│   ├── artifacts.py         # Normalized artifact bundle publishing
+│   ├── workflows.py         # Shared runtime / train / eval workflows
 │   ├── detect.py            # VehicleDetector — image/video detection
 │   ├── track.py             # VehicleTracker — ByteTrack integration
 │   ├── visualize.py         # Visualizer — boxes, trails, FPS overlay
 │   ├── analytics.py         # VehicleAnalytics — counting, zones, export
 │   └── pipeline.py          # VehiclePipeline — end-to-end orchestrator
-├── scripts/
-│   ├── demo.py              # Full CLI demo (detection + tracking + analytics)
-│   ├── train.py             # Fine-tuning script
-│   ├── evaluate.py          # Model evaluation + comparison
-│   ├── train_remote.sh      # Remote CUDA training wrapper
-│   ├── detect_image.py      # Quick single-image test
-│   └── detect_video.py      # Video detection (no tracking)
-├── models/                  # Trained weights (gitignored)
-│   ├── best.pt              # Best fine-tuned checkpoint
-│   └── last.pt              # Final epoch checkpoint
-├── configs/                 # Tracker configs
-├── data/                    # Datasets (gitignored)
-├── outputs/                 # Results (gitignored)
-├── tasks/                   # Project tracking
-│   ├── todo.md
-│   └── lessons.md
+├── scripts/                 # Backward-compatible wrappers around `vtrack`
+├── models/                  # Local checkpoints (gitignored)
+├── artifacts/               # Normalized train/eval bundles (gitignored)
+├── runs/                    # Raw Ultralytics outputs (gitignored)
+├── data/                    # Local datasets (gitignored)
+├── tests/                   # Fast unit/CLI tests + opt-in smoke test
 └── pyproject.toml
 ```
 
@@ -87,15 +81,16 @@ object-det/
 # Clone and set up
 git clone <repo-url> && cd object-det
 uv sync
+uv sync --extra dev   # recommended for pytest + ruff
 
 # Run with pretrained model (auto-downloads yolo11n.pt)
-uv run python scripts/demo.py path/to/video.mp4
+uv run vtrack demo data/test-video.mp4
 
 # Run with fine-tuned KITTI model
-uv run python scripts/demo.py path/to/video.mp4 --model models/best.pt
+uv run vtrack demo data/test-video.mp4 --model models/best.pt
 
 # Enable analytics with a counting line
-uv run python scripts/demo.py path/to/video.mp4 \
+uv run vtrack demo data/test-video.mp4 \
     --model models/best.pt \
     --analytics \
     --line 0,400,1280,400 \
@@ -104,32 +99,28 @@ uv run python scripts/demo.py path/to/video.mp4 \
     --save outputs/annotated.mp4
 
 # Webcam (live)
-uv run python scripts/demo.py 0 --model models/best.pt --analytics
+uv run vtrack demo 0 --model models/best.pt --analytics
 
 # Single image detection
-uv run python scripts/detect_image.py path/to/image.jpg
+uv run vtrack detect-image data/test-image.jpg
 ```
+
+The legacy `scripts/*.py` entrypoints still work, but they now delegate to the same installable CLI.
 
 ### CLI Options
 
 ```
-usage: demo.py source [options]
+usage: vtrack <command> [options]
 
-positional arguments:
-  source                Video file, camera index (0), RTSP URL, or YouTube URL
+commands:
+  demo                  Tracking + analytics on a video source
+  detect-image          Single-image detection
+  detect-video          Detection-only video pass
+  train                 Local training
+  evaluate              Local evaluation and optional baseline comparison
+  train-remote          Remote training + artifact sync
 
-options:
-  --model MODEL         Model weights (default: yolo11n.pt)
-  --confidence FLOAT    Detection threshold (default: 0.25)
-  --tracker TRACKER     bytetrack.yaml or botsort.yaml
-  --trace-length INT    Track trail length in frames (default: 30)
-  --save PATH           Save annotated video
-  --no-display          Headless mode (no OpenCV window)
-  --analytics           Enable counting/stats overlay
-  --line x1,y1,x2,y2   Counting line coordinates
-  --zone x1,y1,...      Monitoring zone polygon (min 3 points)
-  --export-csv PATH     Per-frame data export
-  --export-json PATH    Summary + track details export
+See `uv run vtrack <command> --help` for subcommand-specific options.
 ```
 
 ## Training
@@ -137,28 +128,70 @@ options:
 ### Remote CUDA training (recommended)
 
 ```bash
-# Syncs code to remote, trains, pulls weights back
-./scripts/train_remote.sh --epochs 50 --batch 16
+# Remote host configuration
+export VTRACK_REMOTE_HOST=blackbox
+
+# Optional override. By default vtrack prefers the repo-local remote virtualenv
+# at .venv/bin/python and falls back to python3 only if that virtualenv is
+# missing.
+# export VTRACK_REMOTE_PYTHON=python3
+
+# Optional override. Quote ~ so your local shell does not expand it first.
+# If omitted, vtrack mirrors your local checkout path relative to $HOME,
+# so /Users/grmim/Dev/object-det becomes ~/Dev/object-det on the remote side.
+export VTRACK_REMOTE_DIR='~/Dev/object-det'
+
+# Optional override for Ultralytics builtin datasets like kitti.yaml.
+# If omitted, vtrack uses a sibling datasets directory next to the remote checkout,
+# so ~/Dev/object-det defaults to ~/Dev/datasets.
+# export VTRACK_REMOTE_DATASETS_DIR='~/Dev/datasets'
+
+# Sync code, train remotely, and pull back the normalized artifact bundle + models
+uv run vtrack train-remote --epochs 50 --batch 16
 ```
 
 ### Local training
 
 ```bash
 # CPU (slow — ~18 hours for 50 epochs)
-uv run python scripts/train.py --device cpu --epochs 50
+uv run vtrack train --device cpu --epochs 50
 
 # MPS — not recommended (PyTorch task assigner bug)
-uv run python scripts/train.py --device mps --no-amp --epochs 50
+uv run vtrack train --device mps --no-amp --epochs 50
 ```
 
 ### Evaluation
 
 ```bash
 # Evaluate fine-tuned model
-uv run python scripts/evaluate.py --model models/best.pt --data kitti.yaml
+uv run vtrack evaluate --model models/best.pt --data /Users/grmim/Dev/datasets/kitti/kitti.yaml
 
 # Compare against pretrained baseline
-uv run python scripts/evaluate.py --model models/best.pt --data kitti.yaml --compare
+uv run vtrack evaluate \
+    --model models/best.pt \
+    --data /Users/grmim/Dev/datasets/kitti/kitti.yaml \
+    --compare
+```
+
+## Artifacts
+
+- Normalized bundles are written to `artifacts/train/<run-name>/` and `artifacts/eval/<run-name>/`.
+- Each bundle includes `manifest.json`, `summary.json`, copied plots, and copied weights when relevant.
+- Raw Ultralytics outputs live under `runs/` and are treated as implementation detail.
+- Training also syncs/copies canonical checkpoints into `models/best.pt` and `models/last.pt`, plus named copies such as `models/vehicle_v1_best.pt`.
+
+## Development
+
+```bash
+# Install project + dev tools
+uv sync --extra dev
+
+# Lint and tests
+uv run ruff check src scripts tests
+uv run pytest
+
+# Opt-in smoke evaluation against local assets
+VTRACK_RUN_SMOKE=1 uv run pytest -m smoke
 ```
 
 ## Use Cases

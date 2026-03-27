@@ -1,6 +1,8 @@
 # Data
 data/raw/
 data/processed/
+data/test-image.jpg
+data/test-video.mp4
 
 # Model weights
 models/*.pt
@@ -12,6 +14,8 @@ models/*.mlmodel
 
 # Outputs
 outputs/
+artifacts/
+runs/
 
 # Python
 __pycache__/
@@ -20,6 +24,8 @@ __pycache__/
 .venv/
 *.egg-info/
 dist/
+.pytest_cache/
+.ruff_cache/
 
 # OS
 .DS_Store
@@ -34,8 +40,7 @@ CLAUDE.md
 IDEA.md
 AGENT.md
 
-# Ultralytics
-runs/
+# Generated media / large outputs
 *.pt
 *.jpg
 *.png
