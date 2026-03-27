@@ -17,7 +17,7 @@ def main():
         print(f"Resuming from checkpoint: {resume_from}")
         model = YOLO(resume_from)
     else:
-        model = YOLO("yolo11s.pt")
+        model = YOLO("yolov8n.pt")
 
     # --- Hyperparameters (AutoTrain agent modifies these) ---
     results = model.train(
@@ -35,7 +35,6 @@ def main():
         patience=10,
         save=True,
         plots=True,
-        amp=False,
     )
 
     # Print metrics as JSON for AutoTrain extraction
