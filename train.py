@@ -21,7 +21,7 @@ def main():
 
     # --- Hyperparameters (AutoTrain agent modifies these) ---
     results = model.train(
-        data="kitti.yaml",
+        data="datasets/kitti/kitti.yaml",
         epochs=50,
         imgsz=640,
         batch=16,

@@ -16,8 +16,8 @@ budget:
 execution:
   train_command: ".venv/bin/python train.py"
   mode: ssh
-  ssh_host: tolkien
-  ssh_remote_dir: /home/grmim/object-det
+  ssh_host: blackbox
+  ssh_remote_dir: /home/holt/Dev/object-det
   ssh_setup_command: "~/.local/bin/uv sync"
   gpu_device: "0"
 
