@@ -38,7 +38,12 @@ def main():
         name="autotrain",
         exist_ok=True,
         pretrained=True,
-        lr0=0.001,
+        lr0=0.01,
+        cos_lr=True,
+        fliplr=0.5,
+        hsv_h=0.015,
+        hsv_s=0.7,
+        hsv_v=0.4,
         verbose=True,
         workers=4,
     )
