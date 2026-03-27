@@ -35,7 +35,7 @@ def main():
         patience=10,
         save=True,
         plots=True,
-        amp=True,
+        amp=False,
     )
 
     # Print metrics as JSON for AutoTrain extraction
