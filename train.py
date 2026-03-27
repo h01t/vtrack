@@ -11,6 +11,14 @@ from ultralytics import YOLO
 
 
 def main():
+    # Check dataset exists
+    import yaml
+    data_path = "datasets/kitti/kitti.yaml"
+    if not os.path.exists(data_path):
+        print(f"ERROR: Dataset config not found at {data_path}")
+        print('{"mAP": 0.0, "mAP50_95": 0.0, "precision": 0.0, "recall": 0.0}')
+        return
+    
     # Check if we should resume from a checkpoint
     resume_from = os.environ.get("AUTOTRAIN_RESUME_FROM")
     if resume_from and os.path.exists(resume_from):
@@ -21,16 +29,18 @@ def main():
 
     # --- Hyperparameters (AutoTrain agent modifies these) ---
     results = model.train(
-        data="datasets/kitti/kitti.yaml",
-        epochs=10,
-        imgsz=640,
-        batch=4,
+        data=data_path,
+        epochs=1,
+        imgsz=320,
+        batch=2,
         device="cuda",
         project="outputs/training",
         name="autotrain",
         exist_ok=True,
         pretrained=True,
         lr0=0.001,
+        verbose=True,
+        workers=0,
     )
 
     # Print metrics as JSON for AutoTrain extraction
