@@ -30,11 +30,7 @@ def main():
         name="autotrain",
         exist_ok=True,
         pretrained=True,
-        optimizer="auto",
-        lr0=0.0005,
-        patience=10,
-        save=True,
-        plots=True,
+        lr0=0.001,
     )
 
     # Print metrics as JSON for AutoTrain extraction
