@@ -17,6 +17,9 @@ outputs/
 artifacts/
 runs/
 
+# AutoTrain runtime data
+.autotrain/
+
 # Python
 __pycache__/
 *.pyc
