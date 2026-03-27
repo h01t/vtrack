@@ -20,6 +20,9 @@ runs/
 # AutoTrain runtime data
 .autotrain/
 
+# Datasets (large, managed per-host)
+datasets/
+
 # Python
 __pycache__/
 *.pyc

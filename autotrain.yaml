@@ -20,6 +20,20 @@ execution:
   ssh_remote_dir: /home/holt/Dev/object-det
   ssh_setup_command: "~/.local/bin/uv sync"
   gpu_device: "0"
+  rsync_excludes:
+    - ".venv"
+    - "data"
+    - "__pycache__"
+    - ".git"
+    - ".autotrain"
+    - "*.pt"
+    - "*.pth"
+    - "*.ckpt"
+    - "*.onnx"
+    - "outputs"
+    - "runs"
+    - "datasets"
+    - "artifacts"
 
 sandbox:
   writable_files:
