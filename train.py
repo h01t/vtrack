@@ -17,21 +17,21 @@ def main():
         print(f"Resuming from checkpoint: {resume_from}")
         model = YOLO(resume_from)
     else:
-        model = YOLO("yolo11n.pt")
+        model = YOLO("yolo11s.pt")
 
     # --- Hyperparameters (AutoTrain agent modifies these) ---
     results = model.train(
         data="datasets/kitti/kitti.yaml",
         epochs=50,
         imgsz=640,
-        batch=16,
+        batch=32,
         device="cuda",
         project="outputs/training",
         name="autotrain",
         exist_ok=True,
         pretrained=True,
         optimizer="auto",
-        lr0=0.01,
+        lr0=0.02,
         patience=10,
         save=True,
         plots=True,
