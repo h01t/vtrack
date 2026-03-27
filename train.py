@@ -25,13 +25,13 @@ def main():
         print(f"Resuming from checkpoint: {resume_from}")
         model = YOLO(resume_from)
     else:
-        model = YOLO("yolov8n.pt")
+        model = YOLO("yolov8s.pt")
 
     # --- Hyperparameters (AutoTrain agent modifies these) ---
     results = model.train(
         data=data_path,
         epochs=10,
-        imgsz=320,
+        imgsz=640,
         batch=8,
         device="cuda",
         project="outputs/training",
