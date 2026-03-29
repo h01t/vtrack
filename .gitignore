@@ -51,3 +51,10 @@ AGENT.md
 *.jpg
 *.png
 *.mp4
+
+# Tracked README media
+!docs/media/
+!docs/media/*.png
+!docs/media/*.svg
+!docs/media/*.csv
+!docs/media/*.md

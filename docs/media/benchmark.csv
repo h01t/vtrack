@@ -1,0 +1,4 @@
+tracker,tracker_path,requested_tracker,device,imgsz,vid_stride,frames_processed,timed_frames,wall_time_sec,avg_fps,median_fps,p95_frame_ms,unique_tracks,avg_track_duration_frames,median_track_duration_frames,short_tracks_lt_5_frames,short_tracks_lt_15_frames,per_class_counts,line_crossings_in,line_crossings_out,zone_current_count
+bytetrack,/Users/grmim/Dev/object-det/src/vtrack/trackers/bytetrack.yaml,bytetrack,cpu,640,1,150,120,2.42455,61.78,62.227,16.796,20,24.5,12.5,4,12,"{""car"": 19, ""van"": 1}",0,0,0
+bytetrack-occlusion,/Users/grmim/Dev/object-det/src/vtrack/trackers/bytetrack-occlusion.yaml,bytetrack-occlusion,cpu,640,1,150,120,2.406908,62.312,62.402,16.547,24,22.708,13.0,8,13,"{""car"": 23, ""van"": 1}",0,0,0
+botsort,/Users/grmim/Dev/object-det/src/vtrack/trackers/botsort.yaml,botsort,cpu,640,1,150,120,2.858808,52.332,52.597,19.911,22,22.5,13.0,5,12,"{""car"": 21, ""van"": 1}",0,0,0

@@ -2,6 +2,14 @@
 
 End-to-end vehicle detection, multi-object tracking, and analytics pipeline built on YOLOv11 and fine-tuned on the KITTI dataset.
 
+<p align="center">
+  <a href="https://github.com/h01t/vtrack/releases/download/media/demo-short.mp4">
+    <img src="docs/media/hero-poster.png" alt="vtrack demo poster" width="100%">
+  </a>
+</p>
+
+<p align="center"><sub>Open the short demo video</sub></p>
+
 ## What This Project Does
 
 vtrack takes video input (file, webcam, RTSP stream, or YouTube URL) and:
@@ -11,6 +19,13 @@ vtrack takes video input (file, webcam, RTSP stream, or YouTube URL) and:
 3. **Visualizes** bounding boxes, track trails, and an FPS counter in real-time
 4. **Analyzes** traffic patterns — line-crossing counts, zone occupancy, per-class breakdowns, and track duration statistics
 5. **Exports** analytics to CSV (per-frame) and JSON (summary)
+
+## Visual Tour
+
+| Tracking + Trails | Analytics Overlay |
+|-------------------|-------------------|
+| ![Tracking frame](docs/media/tracking-frame.png) | ![Analytics frame](docs/media/analytics-frame.png) |
+| Persistent IDs and trace lines make it easy to follow vehicles through the scene. | A counting line and summary panel turn the tracker into a lightweight traffic analytics view. |
 
 ## Why This Stack
 
@@ -50,6 +65,12 @@ vtrack takes video input (file, webcam, RTSP stream, or YouTube URL) and:
 | Misc | 0.824 |
 
 The pretrained COCO model scored mAP@0.5 of 0.022 on KITTI due to class ID mismatch — fine-tuning gave a **39x improvement**.
+
+## Tracker Benchmark Snapshot
+
+![Tracker benchmark snapshot](docs/media/benchmark-trackers.svg)
+
+This snapshot comes from `vtrack benchmark-track` on the fine-tuned model using a fixed short clip and CPU inference for repeatability. Exact generation commands, source provenance, and the backing CSV live in [docs/media/README.md](docs/media/README.md).
 
 ## Project Structure
 
