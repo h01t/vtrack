@@ -6,9 +6,21 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from posixpath import dirname
-from typing import Mapping
+from typing import Any, Mapping
 
-from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL, DEFAULT_TRACKER
+from vtrack.config import (
+    DEFAULT_AGNOSTIC_NMS,
+    DEFAULT_CONFIDENCE,
+    DEFAULT_HALF,
+    DEFAULT_IMGSZ,
+    DEFAULT_IOU,
+    DEFAULT_MAX_DET,
+    DEFAULT_MODEL,
+    DEFAULT_STREAM_BUFFER,
+    DEFAULT_TRACK_CONFIDENCE,
+    DEFAULT_TRACKER,
+    DEFAULT_VID_STRIDE,
+)
 
 
 def _discover_project_root() -> Path:
@@ -72,6 +84,24 @@ def normalize_remote_dir(
         return f"~/{relative.as_posix()}"
 
     return raw_dir
+
+
+class InferenceDeviceError(RuntimeError):
+    """Raised when a requested inference device cannot be used."""
+
+
+def validate_inference_device(device: str | None) -> None:
+    """Fail fast for explicitly requested MPS inference on unsupported machines."""
+    if device is None or device.lower() != "mps":
+        return
+
+    import torch
+
+    if not torch.backends.mps.is_available():
+        raise InferenceDeviceError(
+            "MPS inference requested via --device mps, but torch.backends.mps.is_available() "
+            "is False on this machine."
+        )
 
 
 @dataclass(frozen=True)
@@ -138,9 +168,47 @@ class InferenceConfig:
     """Defaults for detection and tracking workflows."""
 
     model_path: str = DEFAULT_MODEL
-    confidence: float = DEFAULT_CONFIDENCE
+    min_confidence: float = DEFAULT_CONFIDENCE
+    track_conf: float = DEFAULT_TRACK_CONFIDENCE
     tracker: str = DEFAULT_TRACKER
     trace_length: int = 30
+    device: str | None = None
+    imgsz: int = DEFAULT_IMGSZ
+    iou: float = DEFAULT_IOU
+    max_det: int = DEFAULT_MAX_DET
+    half: bool = DEFAULT_HALF
+    vid_stride: int = DEFAULT_VID_STRIDE
+    stream_buffer: bool = DEFAULT_STREAM_BUFFER
+    agnostic_nms: bool = DEFAULT_AGNOSTIC_NMS
+
+    @property
+    def confidence(self) -> float:
+        """Compatibility alias for code paths that still read `.confidence`."""
+        return self.min_confidence
+
+    def predict_kwargs(self) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "conf": self.min_confidence,
+            "imgsz": self.imgsz,
+            "iou": self.iou,
+            "max_det": self.max_det,
+            "half": self.half,
+            "agnostic_nms": self.agnostic_nms,
+        }
+        if self.device is not None:
+            kwargs["device"] = self.device
+        return kwargs
+
+    def track_kwargs(self) -> dict[str, Any]:
+        kwargs = self.predict_kwargs()
+        kwargs.update(
+            {
+                "conf": self.track_conf,
+                "vid_stride": self.vid_stride,
+                "stream_buffer": self.stream_buffer,
+            }
+        )
+        return kwargs
 
 
 @dataclass(frozen=True)

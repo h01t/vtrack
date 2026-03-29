@@ -61,8 +61,11 @@ object-det/
 │   ├── model_profiles.py    # Checkpoint metadata / class profile resolution
 │   ├── artifacts.py         # Normalized artifact bundle publishing
 │   ├── workflows.py         # Shared runtime / train / eval workflows
+│   ├── benchmarking.py      # Tracking benchmark report generation
+│   ├── tracker_presets.py   # Built-in tracker preset resolution
 │   ├── detect.py            # VehicleDetector — image/video detection
-│   ├── track.py             # VehicleTracker — ByteTrack integration
+│   ├── track.py             # VehicleTracker — ByteTrack / BoT-SORT integration
+│   ├── trackers/            # Repo-owned tracker YAML presets
 │   ├── visualize.py         # Visualizer — boxes, trails, FPS overlay
 │   ├── analytics.py         # VehicleAnalytics — counting, zones, export
 │   └── pipeline.py          # VehiclePipeline — end-to-end orchestrator
@@ -83,9 +86,6 @@ git clone <repo-url> && cd object-det
 uv sync
 uv sync --extra dev   # recommended for pytest + ruff
 
-# Run with pretrained model (auto-downloads yolo11n.pt)
-uv run vtrack demo data/test-video.mp4
-
 # Run with fine-tuned KITTI model
 uv run vtrack demo data/test-video.mp4 --model models/best.pt
 
@@ -103,17 +103,30 @@ uv run vtrack demo 0 --model models/best.pt --analytics
 
 # Single image detection
 uv run vtrack detect-image data/test-image.jpg
+
+# Compare built-in tracker presets on the same clip
+uv run vtrack benchmark-track data/test-video.mp4 \
+    --model models/best.pt \
+    --device cpu \
+    --tracker bytetrack \
+    --tracker bytetrack-occlusion \
+    --tracker botsort \
+    --max-frames 150 \
+    --export-csv outputs/benchmark.csv
 ```
 
 The legacy `scripts/*.py` entrypoints still work, but they now delegate to the same installable CLI.
 
-### CLI Options
+## Runtime Inference and Tracking
+
+### Core Commands
 
 ```
 usage: vtrack <command> [options]
 
 commands:
   demo                  Tracking + analytics on a video source
+  benchmark-track       Compare tracking presets on a shared source
   detect-image          Single-image detection
   detect-video          Detection-only video pass
   train                 Local training
@@ -121,6 +134,42 @@ commands:
   train-remote          Remote training + artifact sync
 
 See `uv run vtrack <command> --help` for subcommand-specific options.
+```
+
+### Tracking Presets
+
+- `bytetrack` — repo-owned baseline matching Ultralytics ByteTrack defaults
+- `bytetrack-occlusion` — longer lost-track buffer (`track_buffer=60`) for heavier occlusion
+- `botsort` — repo-owned BoT-SORT baseline with `gmc_method=sparseOptFlow` and `with_reid=False`
+- `--tracker` accepts any preset alias above or an explicit YAML path
+
+### Runtime Notes
+
+- For tracking commands, `--track-conf` controls the detector threshold fed into the tracker, while `--confidence` controls the minimum confidence kept for overlays, analytics, and exported summaries.
+- `vtrack benchmark-track` runs one or more tracker presets sequentially on the same source and prints a JSON report to stdout. If `--export-csv` is provided, it also writes one summary row per run.
+- The bundled `data/test-video.mp4` clip is useful for smoke tests and CLI verification, but real tracker comparisons should be run on continuous traffic footage where occlusion and ID persistence matter.
+- MPS is supported for inference via `demo`, `detect-image`, `detect-video`, and `benchmark-track`, but this project still treats Apple Silicon support as inference-only for now.
+
+### More Examples
+
+```bash
+# Run with pretrained model (auto-downloads yolo11n.pt)
+uv run vtrack demo data/test-video.mp4
+
+# Use a repo-owned tracker preset tuned for longer occlusions
+uv run vtrack demo data/test-video.mp4 \
+    --model models/best.pt \
+    --tracker bytetrack-occlusion \
+    --track-conf 0.10
+
+# Apple Silicon inference (training still uses remote CUDA)
+uv run vtrack demo data/test-video.mp4 \
+    --model models/best.pt \
+    --device mps \
+    --no-display
+
+# Detection-only video pass
+uv run vtrack detect-video data/test-video.mp4 --model models/best.pt --save
 ```
 
 ## Training
@@ -156,7 +205,7 @@ uv run vtrack train-remote --epochs 50 --batch 16
 # CPU (slow — ~18 hours for 50 epochs)
 uv run vtrack train --device cpu --epochs 50
 
-# MPS — not recommended (PyTorch task assigner bug)
+# MPS training — not recommended (PyTorch task assigner bug)
 uv run vtrack train --device mps --no-amp --epochs 50
 ```
 
@@ -207,9 +256,9 @@ VTRACK_RUN_SMOKE=1 uv run pytest -m smoke
 
 ### Near-term
 - **Real continuous video testing** — Current validation is on KITTI stills stitched into clips. Test on dashcam and fixed-camera footage for real-world tracking performance.
-- **ByteTrack tuning** — Adjust `track_buffer` for better occlusion handling in dense traffic.
-- **FPS benchmarks** — Profile YOLOv11n vs. YOLOv11s on Apple M4 Pro (MPS inference works, training doesn't).
-- **BoT-SORT comparison** — Benchmark against ByteTrack for accuracy/speed tradeoff.
+- **Continuous tracker benchmarks** — Run the new `benchmark-track` workflow on longer traffic footage and record stable ByteTrack vs. BoT-SORT comparisons.
+- **Formal MOT evaluation** — Add MOT-style ground-truth scoring (ID switches, MOTA/HOTA) on annotated video sequences.
+- **FPS benchmarks** — Profile YOLOv11n vs. YOLOv11s on Apple M4 Pro using the new runtime device controls.
 
 ### Edge deployment
 - **ONNX export** — For cross-platform CPU inference via ONNX Runtime.

@@ -1,10 +1,17 @@
+import sys
+import types
 from pathlib import Path
 
+import pytest
+
 from vtrack.settings import (
+    InferenceConfig,
+    InferenceDeviceError,
     ProjectPaths,
     RemoteConfig,
     default_remote_datasets_dir,
     normalize_remote_dir,
+    validate_inference_device,
 )
 
 
@@ -72,3 +79,23 @@ def test_default_remote_datasets_dir_tracks_remote_checkout_parent() -> None:
         == "~/Dev/datasets"
     )
     assert default_remote_datasets_dir("~/object-det", project_name="object-det") == "~/datasets"
+
+
+def test_inference_config_exposes_confidence_compatibility_alias() -> None:
+    config = InferenceConfig(min_confidence=0.4, track_conf=0.1, device="cpu")
+
+    assert config.confidence == 0.4
+    assert config.track_kwargs()["conf"] == 0.1
+    assert config.track_kwargs()["device"] == "cpu"
+
+
+def test_validate_inference_device_rejects_unavailable_mps(monkeypatch) -> None:
+    fake_torch = types.SimpleNamespace(
+        backends=types.SimpleNamespace(
+            mps=types.SimpleNamespace(is_available=lambda: False)
+        )
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    with pytest.raises(InferenceDeviceError, match="MPS inference requested"):
+        validate_inference_device("mps")

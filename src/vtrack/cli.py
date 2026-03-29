@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from typing import TYPE_CHECKING, Any
 
 from vtrack.settings import (
     EvaluationConfig,
     InferenceConfig,
+    InferenceDeviceError,
     ProjectPaths,
     RemoteConfig,
     TrainingConfig,
@@ -44,34 +46,73 @@ def _parse_source(value: str) -> str | int:
     return int(value) if value.isdigit() else value
 
 
-def _build_analytics(args: argparse.Namespace) -> "VehicleAnalytics | None":
+def _analytics_geometry_from_args(
+    args: argparse.Namespace,
+) -> tuple[tuple[Any, Any] | None, Any | None]:
+    line_geometry = parse_line(args.line) if getattr(args, "line", None) else None
+    polygon_geometry = parse_polygon(args.zone) if getattr(args, "zone", None) else None
+    return line_geometry, polygon_geometry
+
+
+def _build_analytics_from_geometry(
+    line_geometry: tuple[Any, Any] | None,
+    polygon_geometry: Any | None,
+) -> "VehicleAnalytics":
     import supervision as sv
 
     from vtrack.analytics import VehicleAnalytics
 
-    enabled = any(
+    line_zone = None
+    polygon_zone = None
+    if line_geometry is not None:
+        start, end = line_geometry
+        line_zone = sv.LineZone(start=start, end=end)
+    if polygon_geometry is not None:
+        polygon_zone = sv.PolygonZone(polygon=polygon_geometry.copy())
+    return VehicleAnalytics(line_zone=line_zone, polygon_zone=polygon_zone)
+
+
+def _build_analytics(
+    args: argparse.Namespace,
+    *,
+    always: bool = False,
+) -> "VehicleAnalytics | None":
+    enabled = always or any(
         getattr(args, field, None)
         for field in ("analytics", "line", "zone", "export_csv", "export_json")
     )
     if not enabled:
         return None
 
-    line_zone = None
-    polygon_zone = None
-    if getattr(args, "line", None):
-        start, end = parse_line(args.line)
-        line_zone = sv.LineZone(start=start, end=end)
-    if getattr(args, "zone", None):
-        polygon_zone = sv.PolygonZone(polygon=parse_polygon(args.zone))
-    return VehicleAnalytics(line_zone=line_zone, polygon_zone=polygon_zone)
+    line_geometry, polygon_geometry = _analytics_geometry_from_args(args)
+    return _build_analytics_from_geometry(line_geometry, polygon_geometry)
+
+
+def _build_analytics_factory(args: argparse.Namespace):
+    line_geometry, polygon_geometry = _analytics_geometry_from_args(args)
+
+    def factory():
+        return _build_analytics_from_geometry(line_geometry, polygon_geometry)
+
+    return factory
 
 
 def _inference_config_from_args(args: argparse.Namespace) -> InferenceConfig:
+    defaults = InferenceConfig()
     return InferenceConfig(
         model_path=args.model,
-        confidence=args.confidence,
-        tracker=getattr(args, "tracker", InferenceConfig().tracker),
-        trace_length=getattr(args, "trace_length", InferenceConfig().trace_length),
+        min_confidence=args.confidence,
+        track_conf=getattr(args, "track_conf", defaults.track_conf),
+        tracker=getattr(args, "tracker", defaults.tracker),
+        trace_length=getattr(args, "trace_length", defaults.trace_length),
+        device=getattr(args, "device", defaults.device),
+        imgsz=getattr(args, "imgsz", defaults.imgsz),
+        iou=getattr(args, "iou", defaults.iou),
+        max_det=getattr(args, "max_det", defaults.max_det),
+        half=getattr(args, "half", defaults.half),
+        vid_stride=getattr(args, "vid_stride", defaults.vid_stride),
+        stream_buffer=getattr(args, "stream_buffer", defaults.stream_buffer),
+        agnostic_nms=getattr(args, "agnostic_nms", defaults.agnostic_nms),
     )
 
 
@@ -141,6 +182,22 @@ def _cmd_demo(args: argparse.Namespace) -> int:
         export_csv=args.export_csv,
         export_json=args.export_json,
     )
+    return 0
+
+
+def _cmd_benchmark_track(args: argparse.Namespace) -> int:
+    from vtrack.workflows import run_tracking_benchmark
+
+    report = run_tracking_benchmark(
+        source=_parse_source(args.source),
+        inference=_inference_config_from_args(args),
+        trackers=args.trackers,
+        analytics_factory=_build_analytics_factory(args),
+        max_frames=args.max_frames,
+        warmup_frames=args.warmup_frames,
+        export_csv=args.export_csv,
+    )
+    print(json.dumps(report, indent=2))
     return 0
 
 
@@ -251,9 +308,40 @@ def build_parser() -> argparse.ArgumentParser:
     demo = subparsers.add_parser("demo", help="Run tracking + analytics on a video source")
     demo.add_argument("source", help="Video file, camera index (0), RTSP URL, or YouTube URL")
     demo.add_argument("--model", default="yolo11n.pt", help="Model weights path")
-    demo.add_argument("--confidence", type=float, default=0.25, help="Detection confidence")
-    demo.add_argument("--tracker", default="bytetrack.yaml", help="Tracker config")
+    demo.add_argument(
+        "--confidence",
+        type=float,
+        default=0.25,
+        help="Minimum confidence kept for overlays/analytics after tracking",
+    )
+    demo.add_argument(
+        "--track-conf",
+        type=float,
+        default=0.10,
+        help="Detection confidence threshold passed into the tracker",
+    )
+    demo.add_argument(
+        "--tracker",
+        default="bytetrack",
+        help="Tracker preset alias or explicit YAML path",
+    )
     demo.add_argument("--trace-length", type=int, default=30, help="Trail length in frames")
+    demo.add_argument("--device", default=None, help="Inference device (e.g. cpu, cuda, mps)")
+    demo.add_argument("--imgsz", type=int, default=640, help="Inference image size")
+    demo.add_argument("--iou", type=float, default=0.7, help="NMS IoU threshold")
+    demo.add_argument("--max-det", type=int, default=300, help="Maximum detections per frame")
+    demo.add_argument("--half", action="store_true", help="Enable half-precision inference")
+    demo.add_argument("--vid-stride", type=int, default=1, help="Read every Nth video frame")
+    demo.add_argument(
+        "--stream-buffer",
+        action="store_true",
+        help="Buffer all stream frames instead of keeping the latest frame",
+    )
+    demo.add_argument(
+        "--agnostic-nms",
+        action="store_true",
+        help="Use class-agnostic non-maximum suppression",
+    )
     demo.add_argument("--save", default=None, help="Output video path (e.g. outputs/demo.mp4)")
     demo.add_argument("--no-display", action="store_true", help="Disable live display window")
     demo.add_argument("--analytics", action="store_true", help="Enable vehicle analytics")
@@ -277,6 +365,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable Ultralytics save output",
     )
+    detect_image.add_argument(
+        "--device",
+        default=None,
+        help="Inference device (e.g. cpu, cuda, mps)",
+    )
+    detect_image.add_argument("--imgsz", type=int, default=640, help="Inference image size")
+    detect_image.add_argument("--iou", type=float, default=0.7, help="NMS IoU threshold")
+    detect_image.add_argument("--max-det", type=int, default=300, help="Maximum detections")
+    detect_image.add_argument("--half", action="store_true", help="Enable half-precision inference")
+    detect_image.add_argument(
+        "--agnostic-nms",
+        action="store_true",
+        help="Use class-agnostic non-maximum suppression",
+    )
     detect_image.add_argument("--no-show", action="store_true", help="Disable image preview window")
     detect_image.set_defaults(handler=_cmd_detect_image)
 
@@ -284,8 +386,110 @@ def build_parser() -> argparse.ArgumentParser:
     detect_video.add_argument("source", help="Video file path")
     detect_video.add_argument("--model", default="yolo11n.pt", help="Model weights path")
     detect_video.add_argument("--confidence", type=float, default=0.25, help="Detection confidence")
+    detect_video.add_argument(
+        "--device",
+        default=None,
+        help="Inference device (e.g. cpu, cuda, mps)",
+    )
+    detect_video.add_argument("--imgsz", type=int, default=640, help="Inference image size")
+    detect_video.add_argument("--iou", type=float, default=0.7, help="NMS IoU threshold")
+    detect_video.add_argument("--max-det", type=int, default=300, help="Maximum detections")
+    detect_video.add_argument("--half", action="store_true", help="Enable half-precision inference")
+    detect_video.add_argument(
+        "--agnostic-nms",
+        action="store_true",
+        help="Use class-agnostic non-maximum suppression",
+    )
     detect_video.add_argument("--save", action="store_true", help="Save annotated video")
     detect_video.set_defaults(handler=_cmd_detect_video)
+
+    benchmark_track = subparsers.add_parser(
+        "benchmark-track",
+        help="Benchmark tracking presets on a video source",
+    )
+    benchmark_track.add_argument(
+        "source",
+        help="Video file, camera index (0), RTSP URL, or YouTube URL",
+    )
+    benchmark_track.add_argument("--model", default="yolo11n.pt", help="Model weights path")
+    benchmark_track.add_argument(
+        "--confidence",
+        type=float,
+        default=0.25,
+        help="Minimum confidence kept for analytics after tracking",
+    )
+    benchmark_track.add_argument(
+        "--track-conf",
+        type=float,
+        default=0.10,
+        help="Detection confidence threshold passed into the tracker",
+    )
+    benchmark_track.add_argument(
+        "--tracker",
+        dest="trackers",
+        action="append",
+        default=None,
+        help="Tracker preset alias or explicit YAML path; repeat to compare multiple trackers",
+    )
+    benchmark_track.add_argument(
+        "--device",
+        default=None,
+        help="Inference device (e.g. cpu, cuda, mps)",
+    )
+    benchmark_track.add_argument("--imgsz", type=int, default=640, help="Inference image size")
+    benchmark_track.add_argument("--iou", type=float, default=0.7, help="NMS IoU threshold")
+    benchmark_track.add_argument("--max-det", type=int, default=300, help="Maximum detections")
+    benchmark_track.add_argument(
+        "--half",
+        action="store_true",
+        help="Enable half-precision inference",
+    )
+    benchmark_track.add_argument(
+        "--vid-stride",
+        type=int,
+        default=1,
+        help="Read every Nth video frame",
+    )
+    benchmark_track.add_argument(
+        "--stream-buffer",
+        action="store_true",
+        help="Buffer all stream frames instead of keeping the latest frame",
+    )
+    benchmark_track.add_argument(
+        "--agnostic-nms",
+        action="store_true",
+        help="Use class-agnostic non-maximum suppression",
+    )
+    benchmark_track.add_argument(
+        "--line",
+        type=str,
+        default=None,
+        help="Counting line as x1,y1,x2,y2",
+    )
+    benchmark_track.add_argument(
+        "--zone",
+        type=str,
+        default=None,
+        help="Monitoring zone polygon as x1,y1,...",
+    )
+    benchmark_track.add_argument(
+        "--max-frames",
+        type=int,
+        default=None,
+        help="Stop after processing this many frames",
+    )
+    benchmark_track.add_argument(
+        "--warmup-frames",
+        type=int,
+        default=30,
+        help="Exclude the first N frames from latency stats",
+    )
+    benchmark_track.add_argument(
+        "--export-csv",
+        default=None,
+        help="Optional CSV path for one summary row per tracker run",
+    )
+    benchmark_track.set_defaults(handler=_cmd_benchmark_track)
 
     train = subparsers.add_parser("train", help="Train a model locally")
     train.add_argument("--model", default="yolo11n.pt", help="Base model weights")
@@ -351,7 +555,10 @@ def main(argv: list[str] | None = None) -> int:
     command_argv = ["vtrack", *((argv if argv is not None else sys.argv[1:]))]
     args = parser.parse_args(argv)
     args.command_argv = command_argv
-    return args.handler(args)
+    try:
+        return args.handler(args)
+    except InferenceDeviceError as exc:
+        parser.exit(status=2, message=f"error: {exc}\n")
 
 
 def demo_main(argv: list[str] | None = None) -> int:

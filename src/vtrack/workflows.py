@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from ultralytics import YOLO
 
@@ -39,10 +39,19 @@ def run_demo(
 ) -> None:
     pipeline = VehiclePipeline(
         model_path=inference.model_path,
-        confidence=inference.confidence,
+        confidence=inference.min_confidence,
+        track_conf=inference.track_conf,
         tracker=inference.tracker,
         trace_length=inference.trace_length,
         analytics=analytics,
+        device=inference.device,
+        imgsz=inference.imgsz,
+        iou=inference.iou,
+        max_det=inference.max_det,
+        half=inference.half,
+        vid_stride=inference.vid_stride,
+        stream_buffer=inference.stream_buffer,
+        agnostic_nms=inference.agnostic_nms,
     )
     pipeline.run(
         source=source,
@@ -61,7 +70,13 @@ def run_detect_image(
 ) -> list[Any]:
     detector = VehicleDetector(
         model_path=inference.model_path,
-        confidence=inference.confidence,
+        confidence=inference.min_confidence,
+        device=inference.device,
+        imgsz=inference.imgsz,
+        iou=inference.iou,
+        max_det=inference.max_det,
+        half=inference.half,
+        agnostic_nms=inference.agnostic_nms,
     )
     return list(detector.detect_image(source=source, save=save))
 
@@ -75,9 +90,38 @@ def run_detect_video(
 ) -> Any:
     detector = VehicleDetector(
         model_path=inference.model_path,
-        confidence=inference.confidence,
+        confidence=inference.min_confidence,
+        device=inference.device,
+        imgsz=inference.imgsz,
+        iou=inference.iou,
+        max_det=inference.max_det,
+        half=inference.half,
+        agnostic_nms=inference.agnostic_nms,
     )
     return detector.detect_video(source=source, save=save, stream=stream)
+
+
+def run_tracking_benchmark(
+    *,
+    source: str | Path | int,
+    inference: InferenceConfig,
+    trackers: list[str] | None = None,
+    analytics_factory: Callable[[], VehicleAnalytics] | None = None,
+    max_frames: int | None = None,
+    warmup_frames: int = 30,
+    export_csv: str | None = None,
+) -> dict[str, Any]:
+    from vtrack.benchmarking import benchmark_trackers
+
+    return benchmark_trackers(
+        source=source,
+        inference=inference,
+        trackers=trackers,
+        analytics_factory=analytics_factory,
+        max_frames=max_frames,
+        warmup_frames=warmup_frames,
+        export_csv=export_csv,
+    )
 
 
 def run_training(

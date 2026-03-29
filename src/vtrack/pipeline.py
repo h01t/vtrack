@@ -8,7 +8,11 @@ import supervision as sv
 from vtrack.analytics import VehicleAnalytics
 from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL, DEFAULT_TRACKER
 from vtrack.track import VehicleTracker
-from vtrack.visualize import Visualizer, ultralytics_to_detections
+from vtrack.visualize import (
+    Visualizer,
+    filter_detections_by_confidence,
+    ultralytics_to_detections,
+)
 
 
 class VehiclePipeline:
@@ -18,14 +22,32 @@ class VehiclePipeline:
         self,
         model_path: str = DEFAULT_MODEL,
         confidence: float = DEFAULT_CONFIDENCE,
+        track_conf: float | None = None,
         tracker: str = DEFAULT_TRACKER,
         trace_length: int = 30,
         analytics: VehicleAnalytics | None = None,
+        device: str | None = None,
+        imgsz: int = 640,
+        iou: float = 0.7,
+        max_det: int = 300,
+        half: bool = False,
+        vid_stride: int = 1,
+        stream_buffer: bool = False,
+        agnostic_nms: bool = False,
     ):
+        self.min_confidence = confidence
         self.tracker = VehicleTracker(
             model_path=model_path,
-            confidence=confidence,
+            track_conf=track_conf,
             tracker=tracker,
+            device=device,
+            imgsz=imgsz,
+            iou=iou,
+            max_det=max_det,
+            half=half,
+            vid_stride=vid_stride,
+            stream_buffer=stream_buffer,
+            agnostic_nms=agnostic_nms,
         )
         class_names = self.tracker.class_names
         self.visualizer = Visualizer(trace_length=trace_length, class_names=class_names)
@@ -63,10 +85,17 @@ class VehiclePipeline:
         writer = None
         frame_count = 0
 
+        tracker_describer = getattr(self.tracker, "describe_tracker", None)
+        if callable(tracker_describer):
+            print(f"Using tracker: {tracker_describer()}")
+
         try:
             for result in self.tracker.track(source):
                 frame = result.orig_img
-                detections = ultralytics_to_detections(result)
+                detections = filter_detections_by_confidence(
+                    ultralytics_to_detections(result),
+                    self.min_confidence,
+                )
 
                 # Update analytics
                 if self.analytics:

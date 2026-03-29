@@ -121,6 +121,7 @@ class VehicleAnalytics:
             "per_class_counts": per_class,
             "line_crossings_in": self.line_in_count,
             "line_crossings_out": self.line_out_count,
+            "zone_current_count": self.zone_current_count,
             "avg_track_duration_frames": float(np.mean(durations)) if durations else 0,
             "max_track_duration_frames": max(durations) if durations else 0,
             "min_track_duration_frames": min(durations) if durations else 0,

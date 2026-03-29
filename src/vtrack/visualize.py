@@ -90,3 +90,15 @@ class Visualizer:
 def ultralytics_to_detections(result) -> sv.Detections:
     """Convert an Ultralytics result to a supervision Detections object."""
     return sv.Detections.from_ultralytics(result)
+
+
+def filter_detections_by_confidence(
+    detections: sv.Detections,
+    min_confidence: float | None,
+) -> sv.Detections:
+    """Filter detections for downstream overlays and analytics."""
+    if min_confidence is None or len(detections) == 0 or detections.confidence is None:
+        return detections
+
+    mask = detections.confidence >= float(min_confidence)
+    return detections[mask]
