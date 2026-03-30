@@ -273,6 +273,25 @@ VTRACK_RUN_SMOKE=1 uv run pytest -m smoke
 - **Security/surveillance** — Track vehicle movement patterns, detect unusual behavior (wrong-way driving, prolonged stops)
 - **Fleet management** — Count and classify vehicles entering/exiting depots or loading docks
 
+## Reliability & Local Quality Tooling
+
+- Troubleshooting guide: [`docs/troubleshooting.md`](docs/troubleshooting.md)
+- Local hardening architecture notes: [`docs/architecture-local-hardening.md`](docs/architecture-local-hardening.md)
+- Benchmark regression checker script: [`tasks/benchmark_regression.py`](tasks/benchmark_regression.py)
+
+### Benchmark regression check
+
+Use this helper to compare a current benchmark CSV against a baseline and fail when configured latency/FPS thresholds regress.
+
+```bash
+uv run python tasks/benchmark_regression.py \
+  --current docs/media/benchmark.csv \
+  --baseline docs/media/benchmark.csv \
+  --max-fps-regression-pct 15 \
+  --max-p95-increase-pct 20 \
+  --max-median-increase-pct 20
+```
+
 ## Future Improvements
 
 ### Near-term
