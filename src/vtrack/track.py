@@ -5,9 +5,13 @@ from pathlib import Path
 from ultralytics import YOLO
 
 from vtrack.config import DEFAULT_MODEL, DEFAULT_TRACK_CONFIDENCE, DEFAULT_TRACKER
+from vtrack.errors import ModelLoadError, PipelineRuntimeError
+from vtrack.logging_utils import build_log_context, get_logger, log_event
 from vtrack.model_profiles import resolve_model_profile
 from vtrack.settings import InferenceConfig, validate_inference_device
 from vtrack.tracker_presets import ResolvedTrackerConfig, resolve_tracker_config
+
+LOGGER = get_logger(__name__)
 
 
 class VehicleTracker:
@@ -29,7 +33,22 @@ class VehicleTracker:
         agnostic_nms: bool = InferenceConfig().agnostic_nms,
     ):
         validate_inference_device(device)
-        self.model = YOLO(model_path)
+        try:
+            self.model = YOLO(model_path)
+        except Exception as exc:  # pragma: no cover - depends on ultralytics runtime errors
+            log_event(
+                LOGGER,
+                40,
+                "failed to initialize tracker model",
+                build_log_context(
+                    event="tracker_init_failed",
+                    model=model_path,
+                    device=device,
+                    error_type=type(exc).__name__,
+                ),
+            )
+            raise ModelLoadError(f"Failed to initialize tracker model: {model_path}") from exc
+
         self.track_conf = (
             track_conf
             if track_conf is not None
@@ -37,7 +56,21 @@ class VehicleTracker:
             if confidence is not None
             else DEFAULT_TRACK_CONFIDENCE
         )
-        self.profile = resolve_model_profile(self.model, source=model_path)
+        try:
+            self.profile = resolve_model_profile(self.model, source=model_path)
+        except Exception as exc:  # pragma: no cover
+            log_event(
+                LOGGER,
+                40,
+                "failed to resolve tracker model profile",
+                build_log_context(
+                    event="tracker_profile_failed",
+                    model=model_path,
+                    error_type=type(exc).__name__,
+                ),
+            )
+            raise ModelLoadError(f"Failed to resolve tracker profile for: {model_path}") from exc
+
         self.vehicle_classes = self.profile.class_filter
         self.class_names = self.profile.class_names
         self.resolved_tracker: ResolvedTrackerConfig = resolve_tracker_config(tracker)
@@ -80,5 +113,21 @@ class VehicleTracker:
         if self.device is not None:
             kwargs["device"] = self.device
 
-        results = self.model.track(**kwargs)
+        try:
+            results = self.model.track(**kwargs)
+        except Exception as exc:  # pragma: no cover - depends on ultralytics runtime errors
+            log_event(
+                LOGGER,
+                40,
+                "tracking failed",
+                build_log_context(
+                    event="track_failed",
+                    source=str(source),
+                    model=getattr(self.model, "ckpt_path", None) or DEFAULT_MODEL,
+                    tracker=self.resolved_tracker.name,
+                    device=self.device,
+                    error_type=type(exc).__name__,
+                ),
+            )
+            raise PipelineRuntimeError(f"Tracking failed for source: {source}") from exc
         return results

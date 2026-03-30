@@ -1,5 +1,6 @@
 """End-to-end vehicle detection + tracking + visualization pipeline."""
 
+import time
 from pathlib import Path
 
 import cv2
@@ -7,12 +8,16 @@ import supervision as sv
 
 from vtrack.analytics import VehicleAnalytics
 from vtrack.config import DEFAULT_CONFIDENCE, DEFAULT_MODEL, DEFAULT_TRACKER
+from vtrack.errors import PipelineRuntimeError
+from vtrack.logging_utils import build_log_context, get_logger, log_event
 from vtrack.track import VehicleTracker
 from vtrack.visualize import (
     Visualizer,
     filter_detections_by_confidence,
     ultralytics_to_detections,
 )
+
+LOGGER = get_logger(__name__)
 
 
 class VehiclePipeline:
@@ -72,7 +77,7 @@ class VehiclePipeline:
         save_path: str | None = None,
         export_csv: str | None = None,
         export_json: str | None = None,
-    ):
+    ) -> None:
         """Process a video source with tracking, visualization, and analytics.
 
         Args:
@@ -84,10 +89,26 @@ class VehiclePipeline:
         """
         writer = None
         frame_count = 0
+        start = time.perf_counter()
 
         tracker_describer = getattr(self.tracker, "describe_tracker", None)
         if callable(tracker_describer):
             print(f"Using tracker: {tracker_describer()}")
+
+        tracker_model = getattr(self.tracker, "model", None)
+        tracker_resolved = getattr(self.tracker, "resolved_tracker", None)
+        log_event(
+            LOGGER,
+            20,
+            "pipeline started",
+            build_log_context(
+                event="pipeline_start",
+                source=str(source),
+                model=getattr(tracker_model, "ckpt_path", None) or DEFAULT_MODEL,
+                tracker=getattr(tracker_resolved, "name", None),
+                device=getattr(self.tracker, "device", None),
+            ),
+        )
 
         try:
             for result in self.tracker.track(source):
@@ -133,13 +154,38 @@ class VehiclePipeline:
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
 
+        except Exception as exc:
+            log_event(
+                LOGGER,
+                40,
+                "pipeline execution failed",
+                build_log_context(
+                    event="pipeline_failed",
+                    source=str(source),
+                    frame=frame_count,
+                    error_type=type(exc).__name__,
+                ),
+            )
+            raise PipelineRuntimeError(f"Pipeline execution failed for source: {source}") from exc
         finally:
             if writer:
                 writer.release()
             if display:
                 cv2.destroyAllWindows()
 
+        elapsed = time.perf_counter() - start
         print(f"Processed {frame_count} frames.")
+        log_event(
+            LOGGER,
+            20,
+            "pipeline finished",
+            build_log_context(
+                event="pipeline_complete",
+                source=str(source),
+                frame=frame_count,
+                elapsed_ms=round(elapsed * 1000, 2),
+            ),
+        )
         if save_path:
             print(f"Saved to {save_path}")
 
