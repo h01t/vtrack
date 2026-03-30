@@ -273,6 +273,9 @@ VTRACK_RUN_SMOKE=1 uv run pytest -m smoke
 - **Security/surveillance** — Track vehicle movement patterns, detect unusual behavior (wrong-way driving, prolonged stops)
 - **Fleet management** — Count and classify vehicles entering/exiting depots or loading docks
 
+## Implementation Progress (Phased Hardening Plan)
+
+
 ## Reliability & Local Quality Tooling
 
 - Troubleshooting guide: [`docs/troubleshooting.md`](docs/troubleshooting.md)
