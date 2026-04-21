@@ -2,6 +2,7 @@
 
 End-to-end vehicle detection, multi-object tracking, and analytics pipeline built on YOLOv11 and fine-tuned on the KITTI dataset.
 
+> **Academic Project Note:** This repository is a portfolio and academic demonstration built for vehicle detection and tracking. It is intended to show reproducible ML engineering, model evaluation, serving, and monitoring patterns rather than represent a production traffic analytics system.
 <p align="center">
   <a href="https://github.com/h01t/vtrack/releases/download/media/demo-short.mp4">
     <img src="docs/media/hero-poster.png" alt="vtrack demo poster" width="100%">
@@ -19,6 +20,20 @@ vtrack takes video input (file, webcam, RTSP stream, or YouTube URL) and:
 3. **Visualizes** bounding boxes, track trails, and an FPS counter in real-time
 4. **Analyzes** traffic patterns — line-crossing counts, zone occupancy, per-class breakdowns, and track duration statistics
 5. **Exports** analytics to CSV (per-frame) and JSON (summary)
+
+## High-Level Architecture
+
+```mermaid
+graph TD
+    A[Video Source / Webcam] --> B(YOLOv11 Detector)
+    B -->|Bounding Boxes & Confidences| C{Multi-Object Tracker}
+    C -->|Persistent Track IDs| D[Roboflow Supervision]
+    D --> E[Analytics Engine]
+    D --> F[Visualizer Overlay]
+    E -->|Line Crossing & Zone Counts| F
+    E --> G[(CSV/JSON Export)]
+    F --> H[Annotated Video Output]
+```
 
 ## Visual Tour
 
