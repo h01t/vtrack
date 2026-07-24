@@ -13,6 +13,8 @@ from vtrack.settings import (
     TrainingConfig,
     default_remote_datasets_dir,
     normalize_remote_dir,
+    resolve_dataset_config,
+    validate_inference_device,
 )
 
 if TYPE_CHECKING:
@@ -121,9 +123,10 @@ def inference_config_from_args(args: argparse.Namespace) -> InferenceConfig:
 
 def training_config_from_args(args: argparse.Namespace) -> TrainingConfig:
     """Map CLI args into TrainingConfig."""
+    validate_inference_device(args.device)
     return TrainingConfig(
         model_path=args.model,
-        data=args.data,
+        data=resolve_dataset_config(args.data),
         epochs=args.epochs,
         imgsz=args.imgsz,
         batch=args.batch,
@@ -137,7 +140,7 @@ def evaluation_config_from_args(args: argparse.Namespace) -> EvaluationConfig:
     """Map CLI args into EvaluationConfig."""
     return EvaluationConfig(
         model_path=args.model,
-        data=args.data,
+        data=resolve_dataset_config(args.data),
         name=args.name,
         baseline_model_path=args.baseline,
         compare=args.compare,

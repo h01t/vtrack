@@ -64,10 +64,11 @@ def resolve_model_profile(
     source: str | None = None,
 ) -> ModelProfile:
     """Build a model profile from a loaded YOLO model or checkpoint path."""
-    if isinstance(model_or_path, YOLO):
-        model = model_or_path
-        resolved_source = source or str(getattr(model, "ckpt_path", DEFAULT_MODEL))
-    else:
+    if isinstance(model_or_path, (str, Path)):
         resolved_source = source or str(model_or_path)
         model = YOLO(resolved_source)
+    else:
+        # Duck-typed Ultralytics models (and test doubles) expose `.names`.
+        model = model_or_path
+        resolved_source = source or str(getattr(model, "ckpt_path", DEFAULT_MODEL))
     return profile_from_names(getattr(model, "names", None), source=resolved_source)

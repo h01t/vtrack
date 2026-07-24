@@ -90,7 +90,7 @@ This snapshot comes from `vtrack benchmark-track` on the fine-tuned model using 
 ## Project Structure
 
 ```
-object-det/
+vtrack/
 ├── src/vtrack/              # Installable package
 │   ├── cli.py               # Unified `vtrack` CLI
 │   ├── settings.py          # Typed settings + canonical path layout
@@ -105,53 +105,65 @@ object-det/
 │   ├── visualize.py         # Visualizer — boxes, trails, FPS overlay
 │   ├── analytics.py         # VehicleAnalytics — counting, zones, export
 │   └── pipeline.py          # VehiclePipeline — end-to-end orchestrator
+├── configs/                 # Host dataset configs (e.g. kitti.yaml → /srv/ai)
 ├── scripts/                 # Backward-compatible wrappers around `vtrack`
-├── models/                  # Local checkpoints (gitignored)
+├── models/                  # Local published checkpoints (gitignored)
 ├── artifacts/               # Normalized train/eval bundles (gitignored)
 ├── runs/                    # Raw Ultralytics outputs (gitignored)
-├── data/                    # Local datasets (gitignored)
+├── data/                    # Local sample media (gitignored)
 ├── tests/                   # Fast unit/CLI tests + opt-in smoke test
 └── pyproject.toml
 ```
 
 ## Quick Start
 
+Canonical compute host is **blackbox** (Linux + RTX 3060 Ti). Use the Mac only as a Remote SSH / viewing client.
+
 ```bash
-# Clone and set up
-git clone <repo-url> && cd object-det
+# On blackbox
+git clone <repo-url> && cd vtrack
+cp .env.example .env   # optional; defaults already point at /srv/ai
 uv sync
 uv sync --extra dev   # recommended for pytest + ruff
 
-# Run with fine-tuned KITTI model
-uv run vtrack demo data/test-video.mp4 --model models/best.pt
+# Run with fine-tuned KITTI model (CUDA)
+uv run vtrack demo data/test-video.mp4 --model models/best.pt --device cuda
 
 # Enable analytics with a counting line
 uv run vtrack demo data/test-video.mp4 \
     --model models/best.pt \
+    --device cuda \
+    --no-display \
     --analytics \
     --line 0,400,1280,400 \
-    --export-json outputs/summary.json \
-    --export-csv outputs/frames.csv \
-    --save outputs/annotated.mp4
+    --export-json /srv/ai/outputs/vtrack/summary.json \
+    --export-csv /srv/ai/outputs/vtrack/frames.csv \
+    --save /srv/ai/outputs/vtrack/annotated.mp4
 
-# Webcam (live)
-uv run vtrack demo 0 --model models/best.pt --analytics
+# Webcam (live, display on the machine with a monitor/X)
+uv run vtrack demo 0 --model models/best.pt --device cuda --analytics
 
 # Single image detection
-uv run vtrack detect-image data/test-image.jpg
+uv run vtrack detect-image data/test-image.jpg --device cuda
 
 # Compare built-in tracker presets on the same clip
 uv run vtrack benchmark-track data/test-video.mp4 \
     --model models/best.pt \
-    --device cpu \
+    --device cuda \
     --tracker bytetrack \
     --tracker bytetrack-occlusion \
     --tracker botsort \
     --max-frames 150 \
-    --export-csv outputs/benchmark.csv
+    --export-csv /srv/ai/outputs/vtrack/benchmark.csv
 ```
 
 The legacy `scripts/*.py` entrypoints still work, but they now delegate to the same installable CLI.
+
+### Mac access pattern
+
+- Open `/home/tron/projects/vtrack` via Cursor / VS Code **Remote SSH** (`tron@blackbox`).
+- Long jobs belong in `tmux` (e.g. `tmux new -A -s vtrack`) so Mac sleep/disconnect does not kill training.
+- View outputs with `scp`/`rsync` from `/srv/ai/outputs/vtrack` or browse them in the Remote SSH workspace.
 
 ## Runtime Inference and Tracking
 
@@ -165,9 +177,9 @@ commands:
   benchmark-track       Compare tracking presets on a shared source
   detect-image          Single-image detection
   detect-video          Detection-only video pass
-  train                 Local training
+  train                 Local CUDA training (primary on blackbox)
   evaluate              Local evaluation and optional baseline comparison
-  train-remote          Remote training + artifact sync
+  train-remote          Legacy remote push/train/pull helper
 
 See `uv run vtrack <command> --help` for subcommand-specific options.
 ```
@@ -183,87 +195,72 @@ See `uv run vtrack <command> --help` for subcommand-specific options.
 
 - For tracking commands, `--track-conf` controls the detector threshold fed into the tracker, while `--confidence` controls the minimum confidence kept for overlays, analytics, and exported summaries.
 - `vtrack benchmark-track` runs one or more tracker presets sequentially on the same source and prints a JSON report to stdout. If `--export-csv` is provided, it also writes one summary row per run.
-- The bundled `data/test-video.mp4` clip is useful for smoke tests and CLI verification, but real tracker comparisons should be run on continuous traffic footage where occlusion and ID persistence matter.
-- MPS is supported for inference via `demo`, `detect-image`, `detect-video`, and `benchmark-track`, but this project still treats Apple Silicon support as inference-only for now.
+- Prefer `--device cuda` on blackbox. Check `nvidia-smi` first — the 8 GiB 3060 Ti should not share heavy jobs (translation services, large ComfyUI graphs) with training.
+- MPS remains available for Apple Silicon *inference* only; do not use MPS for training (PyTorch YOLO task-assigner bug).
 
 ### More Examples
 
 ```bash
 # Run with pretrained model (auto-downloads yolo11n.pt)
-uv run vtrack demo data/test-video.mp4
+uv run vtrack demo data/test-video.mp4 --device cuda --no-display
 
 # Use a repo-owned tracker preset tuned for longer occlusions
 uv run vtrack demo data/test-video.mp4 \
     --model models/best.pt \
+    --device cuda \
     --tracker bytetrack-occlusion \
     --track-conf 0.10
 
-# Apple Silicon inference (training still uses remote CUDA)
-uv run vtrack demo data/test-video.mp4 \
-    --model models/best.pt \
-    --device mps \
-    --no-display
-
 # Detection-only video pass
-uv run vtrack detect-video data/test-video.mp4 --model models/best.pt --save
+uv run vtrack detect-video data/test-video.mp4 --model models/best.pt --device cuda --save
 ```
 
 ## Training
 
-### Remote CUDA training (recommended)
+### Local CUDA training (recommended on blackbox)
+
+KITTI lives under `/srv/ai/datasets/kitti`. The repo ships [`configs/kitti.yaml`](configs/kitti.yaml) with an absolute `path` so Ultralytics does not re-download the dataset.
 
 ```bash
-# Remote host configuration
-export VTRACK_REMOTE_HOST=blackbox
+# Free the GPU first: nvidia-smi
+tmux new -A -s vtrack
 
-# Optional override. By default vtrack prefers the repo-local remote virtualenv
-# at .venv/bin/python and falls back to python3 only if that virtualenv is
-# missing.
-# export VTRACK_REMOTE_PYTHON=python3
-
-# Optional override. Quote ~ so your local shell does not expand it first.
-# If omitted, vtrack mirrors your local checkout path relative to $HOME,
-# so /Users/grmim/Dev/object-det becomes ~/Dev/object-det on the remote side.
-export VTRACK_REMOTE_DIR='~/Dev/object-det'
-
-# Optional override for Ultralytics builtin datasets like kitti.yaml.
-# If omitted, vtrack uses a sibling datasets directory next to the remote checkout,
-# so ~/Dev/object-det defaults to ~/Dev/datasets.
-# export VTRACK_REMOTE_DATASETS_DIR='~/Dev/datasets'
-
-# Sync code, train remotely, and pull back the normalized artifact bundle + models
-uv run vtrack train-remote --epochs 50 --batch 16
+uv run vtrack train \
+  --model yolo11n.pt \
+  --data configs/kitti.yaml \
+  --epochs 50 \
+  --imgsz 640 \
+  --batch 16 \
+  --device cuda \
+  --name vehicle_v1
 ```
 
-### Local training
+Defaults: `--device cuda`, dataset alias `kitti.yaml` resolves via `VTRACK_KITTI_YAML` / `configs/kitti.yaml` / `/srv/ai/datasets/kitti/kitti.yaml`.
 
-```bash
-# CPU (slow — ~18 hours for 50 epochs)
-uv run vtrack train --device cpu --epochs 50
-
-# MPS training — not recommended (PyTorch task assigner bug)
-uv run vtrack train --device mps --no-amp --epochs 50
-```
+On OOM with 8 GiB VRAM, drop `--batch` to `8` or `4` before changing `imgsz`. Keep AMP enabled (default).
 
 ### Evaluation
 
 ```bash
-# Evaluate fine-tuned model
-uv run vtrack evaluate --model models/best.pt --data /Users/grmim/Dev/datasets/kitti/kitti.yaml
+uv run vtrack evaluate --model models/best.pt --data configs/kitti.yaml
 
-# Compare against pretrained baseline
 uv run vtrack evaluate \
     --model models/best.pt \
-    --data /Users/grmim/Dev/datasets/kitti/kitti.yaml \
+    --data configs/kitti.yaml \
     --compare
 ```
+
+### Legacy remote training
+
+`train-remote` remains for Mac→SSH push workflows but is no longer the happy path. Prefer local `vtrack train` on blackbox.
 
 ## Artifacts
 
 - Normalized bundles are written to `artifacts/train/<run-name>/` and `artifacts/eval/<run-name>/`.
 - Each bundle includes `manifest.json`, `summary.json`, copied plots, and copied weights when relevant.
 - Raw Ultralytics outputs live under `runs/` and are treated as implementation detail.
-- Training also syncs/copies canonical checkpoints into `models/best.pt` and `models/last.pt`, plus named copies such as `models/vehicle_v1_best.pt`.
+- Training copies canonical checkpoints into `models/best.pt` / `models/last.pt` (plus named copies) and mirrors them to `/srv/ai/checkpoints/vtrack` (`VTRACK_CHECKPOINT_DIR`).
+- Demo / export outputs should prefer `/srv/ai/outputs/vtrack` (`VTRACK_OUTPUT_DIR`).
 
 ## Development
 
@@ -314,13 +311,13 @@ uv run python tasks/benchmark_regression.py \
 
 ### Near-term
 - **Real continuous video testing** — Current validation is on KITTI stills stitched into clips. Test on dashcam and fixed-camera footage for real-world tracking performance.
-- **Continuous tracker benchmarks** — Run the new `benchmark-track` workflow on longer traffic footage and record stable ByteTrack vs. BoT-SORT comparisons.
+- **Continuous tracker benchmarks** — Run `benchmark-track` on longer traffic footage with `--device cuda` and record ByteTrack vs. BoT-SORT comparisons.
 - **Formal MOT evaluation** — Add MOT-style ground-truth scoring (ID switches, MOTA/HOTA) on annotated video sequences.
-- **FPS benchmarks** — Profile YOLOv11n vs. YOLOv11s on Apple M4 Pro using the new runtime device controls.
+- **FPS benchmarks** — Profile YOLOv11n vs. YOLOv11s on the blackbox 3060 Ti (and optionally Apple Silicon inference-only).
 
 ### Edge deployment
 - **ONNX export** — For cross-platform CPU inference via ONNX Runtime.
-- **CoreML export** — Optimized inference on Apple Silicon (macOS/iOS).
+- **CoreML export** — Optional Apple Silicon inference path (macOS/iOS).
 - **Raspberry Pi** — TFLite or NCNN for embedded deployment, continuing from prior thesis work.
 - **Quantization** — INT8 quantization for 2-4x speedup on edge devices.
 

@@ -195,10 +195,16 @@ def sync_checkpoints_to_models(
     paths: ProjectPaths,
     checkpoint_dir: str | Path,
     run_name: str,
+    mirror_dir: str | Path | None = None,
 ) -> dict[str, Path]:
-    """Copy best/last checkpoints into the local models directory."""
+    """Copy best/last checkpoints into the local models directory and optional mirror."""
     source_dir = Path(checkpoint_dir)
     paths.models_dir.mkdir(parents=True, exist_ok=True)
+
+    mirror_root: Path | None = None
+    if mirror_dir is not None:
+        mirror_root = Path(mirror_dir)
+        mirror_root.mkdir(parents=True, exist_ok=True)
 
     copied: dict[str, Path] = {}
     for filename in ("best.pt", "last.pt"):
@@ -210,6 +216,9 @@ def sync_checkpoints_to_models(
         named_target = paths.models_dir / f"{run_name}_{filename}"
         shutil.copy2(source, canonical_target)
         shutil.copy2(source, named_target)
+        if mirror_root is not None:
+            shutil.copy2(source, mirror_root / filename)
+            shutil.copy2(source, mirror_root / f"{run_name}_{filename}")
         copied[filename] = canonical_target
 
     return copied

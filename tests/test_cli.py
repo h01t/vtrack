@@ -96,6 +96,16 @@ def test_benchmark_parser_collects_multiple_trackers() -> None:
     assert args.trackers == ["bytetrack", "botsort"]
 
 
+def test_train_parser_defaults_to_cuda() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["train"])
+
+    assert args.device == "cuda"
+
+    root_help = run_command([str(VTRACK_BIN), "--help"]).stdout
+    assert "Legacy" in root_help
+
+
 def test_demo_wrapper_delegates_to_cli() -> None:
     completed = run_command([sys.executable, "scripts/demo.py", "--help"])
 

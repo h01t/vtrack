@@ -7,19 +7,22 @@ This guide covers common local runtime failures and operational recovery paths a
 ### Symptom
 - CLI exits with an error similar to:
   - `MPS inference requested ... is_available() returned False`
+  - `CUDA inference requested ... torch.cuda.is_available() is False`
 
 ### Cause
 - Selected device is unavailable on current machine/runtime.
 
 ### Resolution
+- On blackbox, prefer `--device cuda` after checking `nvidia-smi`.
 - Explicitly switch to a supported device:
+  - `--device cuda` (NVIDIA hosts; default for `vtrack train`)
   - `--device cpu`
-  - `--device mps` (Apple Silicon only when available)
-  - `--device cuda` (NVIDIA-only hosts)
+  - `--device mps` (Apple Silicon inference only when available)
 
 ### Verify
 ```bash
-uv run vtrack detect-image --device cpu --help
+uv run python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)"
+uv run vtrack train --help   # should list cuda as the device default
 ```
 
 ---
@@ -88,13 +91,53 @@ VTRACK_LOG_LEVEL=DEBUG uv run vtrack detect-video data/test-video.mp4 --device c
 
 ---
 
-## 5) Remote training command failures
+## 5) GPU OOM / crowded VRAM on blackbox
+
+### Symptom
+- Training or demo fails with CUDA OOM, or runs extremely slowly while another process owns the GPU.
+
+### Cause
+- RTX 3060 Ti has 8 GiB. Heavy neighbors (NLLB, large ComfyUI graphs, vLLM) can leave too little free memory.
+
+### Resolution
+- Run `nvidia-smi` and stop/pause the other GPU owner for the train window.
+- Lower `--batch` (16 → 8 → 4) before changing `--imgsz`.
+- Keep AMP enabled (do not pass `--no-amp` unless debugging).
+
+### Verify
+```bash
+nvidia-smi
+# expect several GiB free before `vtrack train --device cuda`
+```
+
+---
+
+## 6) Dataset path / unexpected KITTI re-download
+
+### Symptom
+- Ultralytics starts downloading `kitti.zip` even though KITTI already exists under `/srv/ai/datasets/kitti`.
+
+### Cause
+- Relative `path: kitti` in a yaml combined with the wrong Ultralytics `datasets_dir`.
+
+### Resolution
+- Train/eval with `configs/kitti.yaml` (absolute `path: /srv/ai/datasets/kitti`).
+- Or set `VTRACK_KITTI_YAML` / `VTRACK_DATASETS_DIR` from `.env.example`.
+
+### Verify
+```bash
+uv run python -c "from vtrack.settings import resolve_dataset_config; print(resolve_dataset_config('kitti.yaml'))"
+```
+
+---
+
+## 7) Remote training command failures (legacy)
 
 ### Symptom
 - `train-remote` fails during command execution/sync.
 
 ### Cause
-- SSH connectivity, remote env mismatch, remote path mismatch, or command failure.
+- SSH connectivity, remote env mismatch, remote path mismatch, or command failure. Prefer local `vtrack train` on blackbox.
 
 ### Resolution
 - Verify remote host and directory flags/env:
@@ -110,7 +153,7 @@ bash scripts/train_remote.sh --help
 
 ---
 
-## 6) Benchmark regression checks fail
+## 8) Benchmark regression checks fail
 
 ### Symptom
 - Regression script exits non-zero with throughput/latency threshold failures.
@@ -132,7 +175,7 @@ uv run python tasks/benchmark_regression.py \
 
 ---
 
-## 7) Lint/test regressions after refactors
+## 9) Lint/test regressions after refactors
 
 ### Symptom
 - Ruff import-order failures or test import errors in CLI modules.

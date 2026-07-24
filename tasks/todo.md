@@ -19,8 +19,9 @@
 - [x] Create scripts/train.py + scripts/evaluate.py
 - [x] Fix SSH key auth to CUDA workstation (blackbox, 192.168.1.100)
 - [x] Set up remote CUDA training (3060 Ti, scripts/train_remote.sh)
-- [ ] Fine-tune YOLOv11n on KITTI (50 epochs, CUDA) — **IN PROGRESS: epoch ~27/50, mAP@0.5 = 0.779**
-- [ ] Pull trained weights to models/ and run final evaluation
+- [x] Flip project to blackbox-native local CUDA (defaults, `/srv/ai` paths)
+- [x] Fine-tune YOLOv11n on KITTI (50 epochs, CUDA) — blackbox-local retrain, mAP@0.5 ≈ 0.850
+- [x] Publish `models/best.pt` + `/srv/ai/checkpoints/vtrack` and run final evaluation / smoke
 
 ## Phase 3: Multi-Object Tracking
 - [x] Create src/vtrack/track.py (VehicleTracker with ByteTrack via Ultralytics model.track())

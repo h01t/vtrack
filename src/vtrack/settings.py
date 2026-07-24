@@ -22,6 +22,11 @@ from vtrack.config import (
     DEFAULT_VID_STRIDE,
 )
 
+DEFAULT_DATASETS_DIR = Path("/srv/ai/datasets")
+DEFAULT_CHECKPOINT_DIR = Path("/srv/ai/checkpoints/vtrack")
+DEFAULT_OUTPUT_DIR = Path("/srv/ai/outputs/vtrack")
+DEFAULT_KITTI_DATA = "kitti.yaml"
+
 
 def _discover_project_root() -> Path:
     """Return the repository root for an editable src-layout checkout."""
@@ -90,18 +95,95 @@ class InferenceDeviceError(RuntimeError):
     """Raised when a requested inference device cannot be used."""
 
 
+def datasets_dir(env: Mapping[str, str] | None = None) -> Path:
+    """Return the host datasets root (blackbox default: /srv/ai/datasets)."""
+    data = os.environ if env is None else env
+    raw = data.get("VTRACK_DATASETS_DIR")
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_DATASETS_DIR
+
+
+def checkpoint_dir(env: Mapping[str, str] | None = None) -> Path:
+    """Return the host checkpoint mirror root."""
+    data = os.environ if env is None else env
+    raw = data.get("VTRACK_CHECKPOINT_DIR")
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_CHECKPOINT_DIR
+
+
+def output_dir(env: Mapping[str, str] | None = None) -> Path:
+    """Return the host outputs root for demos and exports."""
+    data = os.environ if env is None else env
+    raw = data.get("VTRACK_OUTPUT_DIR")
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_OUTPUT_DIR
+
+
+def default_kitti_yaml(env: Mapping[str, str] | None = None) -> Path:
+    """Return the preferred KITTI dataset yaml path for this host."""
+    data = os.environ if env is None else env
+    raw = data.get("VTRACK_KITTI_YAML")
+    if raw:
+        return Path(raw).expanduser()
+
+    project_config = _discover_project_root() / "configs" / "kitti.yaml"
+    if project_config.is_file():
+        return project_config
+
+    return datasets_dir(env) / "kitti" / "kitti.yaml"
+
+
+def resolve_dataset_config(data: str, env: Mapping[str, str] | None = None) -> str:
+    """Resolve builtin KITTI aliases to the host dataset path when present."""
+    candidate = Path(data).expanduser()
+    if candidate.is_file():
+        return str(candidate.resolve())
+
+    if data in (DEFAULT_KITTI_DATA, "kitti"):
+        kitti_yaml = default_kitti_yaml(env)
+        if kitti_yaml.is_file():
+            return str(kitti_yaml.resolve())
+
+    return data
+
+
+def apply_ultralytics_datasets_dir(env: Mapping[str, str] | None = None) -> Path:
+    """Point Ultralytics builtin dataset downloads/lookups at the host datasets root."""
+    from ultralytics import settings as ultralytics_settings
+
+    root = datasets_dir(env)
+    root.mkdir(parents=True, exist_ok=True)
+    ultralytics_settings.update({"datasets_dir": str(root.resolve())})
+    return root
+
+
 def validate_inference_device(device: str | None) -> None:
-    """Fail fast for explicitly requested MPS inference on unsupported machines."""
-    if device is None or device.lower() != "mps":
+    """Fail fast when an explicitly requested accelerator is unavailable."""
+    if device is None:
         return
 
-    import torch
+    normalized = device.lower()
+    if normalized == "mps":
+        import torch
 
-    if not torch.backends.mps.is_available():
-        raise InferenceDeviceError(
-            "MPS inference requested via --device mps, but torch.backends.mps.is_available() "
-            "is False on this machine."
-        )
+        if not torch.backends.mps.is_available():
+            raise InferenceDeviceError(
+                "MPS inference requested via --device mps, but torch.backends.mps.is_available() "
+                "is False on this machine."
+            )
+        return
+
+    if normalized in {"cuda", "0"} or normalized.startswith("cuda:"):
+        import torch
+
+        if not torch.cuda.is_available():
+            raise InferenceDeviceError(
+                "CUDA inference requested via --device "
+                f"{device}, but torch.cuda.is_available() is False on this machine."
+            )
 
 
 @dataclass(frozen=True)
@@ -216,11 +298,11 @@ class TrainingConfig:
     """Training settings shared by local and remote training commands."""
 
     model_path: str = DEFAULT_MODEL
-    data: str = "kitti.yaml"
+    data: str = DEFAULT_KITTI_DATA
     epochs: int = 50
     imgsz: int = 640
     batch: int = 16
-    device: str = "mps"
+    device: str = "cuda"
     name: str = "vehicle_v1"
     amp: bool = True
 
@@ -230,7 +312,7 @@ class EvaluationConfig:
     """Evaluation settings for a fine-tuned checkpoint and optional baseline."""
 
     model_path: str
-    data: str = "kitti.yaml"
+    data: str = DEFAULT_KITTI_DATA
     name: str = "eval"
     baseline_model_path: str = DEFAULT_MODEL
     compare: bool = False

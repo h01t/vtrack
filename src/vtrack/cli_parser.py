@@ -207,13 +207,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     benchmark_track.set_defaults(handler=cmd_benchmark_track)
 
-    train = subparsers.add_parser("train", help="Train a model locally")
+    train = subparsers.add_parser("train", help="Train a model locally (CUDA on blackbox)")
     train.add_argument("--model", default="yolo11n.pt", help="Base model weights")
     train.add_argument("--data", default="kitti.yaml", help="Dataset config")
     train.add_argument("--epochs", type=int, default=50)
     train.add_argument("--imgsz", type=int, default=640)
     train.add_argument("--batch", type=int, default=16)
-    train.add_argument("--device", default="mps", help="Device: mps, cpu, or cuda")
+    train.add_argument("--device", default="cuda", help="Device: cuda, cpu, or mps")
     train.add_argument("--name", default="vehicle_v1", help="Run name")
     train.add_argument("--no-amp", action="store_true", help="Disable mixed precision")
     train.set_defaults(handler=cmd_train)
@@ -228,7 +228,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     train_remote = subparsers.add_parser(
         "train-remote",
-        help="Run remote training and sync artifacts",
+        help="Legacy: push code to a remote host, train, and sync artifacts",
     )
     train_remote.add_argument("--model", default="yolo11n.pt", help="Base model weights")
     train_remote.add_argument("--data", default="kitti.yaml", help="Dataset config")

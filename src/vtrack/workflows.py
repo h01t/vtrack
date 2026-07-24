@@ -24,6 +24,10 @@ from vtrack.settings import (
     ProjectPaths,
     RemoteConfig,
     TrainingConfig,
+    apply_ultralytics_datasets_dir,
+    checkpoint_dir,
+    resolve_dataset_config,
+    validate_inference_device,
 )
 
 
@@ -131,11 +135,14 @@ def run_training(
     command: list[str],
 ) -> tuple[Any, ArtifactBundle]:
     paths.ensure_runtime_dirs()
+    validate_inference_device(training.device)
+    apply_ultralytics_datasets_dir()
+    resolved_data = resolve_dataset_config(training.data)
 
     model = YOLO(training.model_path)
     metrics = model.train(
         amp=training.amp,
-        data=training.data,
+        data=resolved_data,
         epochs=training.epochs,
         imgsz=training.imgsz,
         batch=training.batch,
@@ -152,23 +159,26 @@ def run_training(
     )
 
     raw_output_path = Path(getattr(metrics, "save_dir", paths.raw_training_dir / training.name))
-    checkpoint_dir = raw_output_path / "weights"
+    weights_dir = raw_output_path / "weights"
+    host_checkpoint_dir = checkpoint_dir()
     copied = sync_checkpoints_to_models(
         paths=paths,
-        checkpoint_dir=checkpoint_dir,
+        checkpoint_dir=weights_dir,
         run_name=training.name,
+        mirror_dir=host_checkpoint_dir,
     )
 
     summary = extract_metrics_summary(metrics)
     summary["training"] = {
         "run_name": training.name,
         "device": training.device,
-        "data": training.data,
+        "data": resolved_data,
         "epochs": training.epochs,
         "imgsz": training.imgsz,
         "batch": training.batch,
         "amp": training.amp,
         "published_checkpoints": {name: str(path) for name, path in copied.items()},
+        "checkpoint_mirror": str(host_checkpoint_dir),
     }
 
     bundle = publish_artifact_bundle(
@@ -178,8 +188,8 @@ def run_training(
         summary=summary,
         command=command,
         raw_output_path=raw_output_path,
-        dataset_path=training.data,
-        checkpoint_path=str(copied.get("best.pt") or (checkpoint_dir / "best.pt")),
+        dataset_path=resolved_data,
+        checkpoint_path=str(copied.get("best.pt") or (weights_dir / "best.pt")),
     )
     return metrics, bundle
 
@@ -191,10 +201,12 @@ def run_evaluation(
     command: list[str],
 ) -> dict[str, Any]:
     paths.ensure_runtime_dirs()
+    apply_ultralytics_datasets_dir()
+    resolved_data = resolve_dataset_config(evaluation.data)
 
     finetuned_model = YOLO(evaluation.model_path)
     finetuned_metrics = finetuned_model.val(
-        data=evaluation.data,
+        data=resolved_data,
         project=str(paths.raw_evaluation_dir.resolve()),
         name=f"{evaluation.name}_finetuned",
         exist_ok=True,
@@ -207,7 +219,7 @@ def run_evaluation(
     if evaluation.compare:
         baseline_model = YOLO(evaluation.baseline_model_path)
         baseline_metrics = baseline_model.val(
-            data=evaluation.data,
+            data=resolved_data,
             project=str(paths.raw_evaluation_dir.resolve()),
             name=f"{evaluation.name}_baseline",
             exist_ok=True,
@@ -250,7 +262,7 @@ def run_evaluation(
             if baseline_raw_output_path is not None
             else None
         ),
-        dataset_path=evaluation.data,
+        dataset_path=resolved_data,
         checkpoint_path=evaluation.model_path,
         baseline_path=evaluation.baseline_model_path if evaluation.compare else None,
     )

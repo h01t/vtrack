@@ -9,8 +9,11 @@ from vtrack.settings import (
     InferenceDeviceError,
     ProjectPaths,
     RemoteConfig,
+    TrainingConfig,
+    default_kitti_yaml,
     default_remote_datasets_dir,
     normalize_remote_dir,
+    resolve_dataset_config,
     validate_inference_device,
 )
 
@@ -99,3 +102,26 @@ def test_validate_inference_device_rejects_unavailable_mps(monkeypatch) -> None:
 
     with pytest.raises(InferenceDeviceError, match="MPS inference requested"):
         validate_inference_device("mps")
+
+
+def test_validate_inference_device_rejects_unavailable_cuda(monkeypatch) -> None:
+    fake_torch = types.SimpleNamespace(cuda=types.SimpleNamespace(is_available=lambda: False))
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    with pytest.raises(InferenceDeviceError, match="CUDA inference requested"):
+        validate_inference_device("cuda")
+
+
+def test_training_config_defaults_to_cuda() -> None:
+    assert TrainingConfig().device == "cuda"
+
+
+def test_resolve_dataset_config_prefers_env_kitti_yaml(tmp_path: Path, monkeypatch) -> None:
+    kitti_yaml = tmp_path / "custom-kitti.yaml"
+    kitti_yaml.write_text("path: /tmp/kitti\n", encoding="utf-8")
+    monkeypatch.setenv("VTRACK_KITTI_YAML", str(kitti_yaml))
+
+    resolved = resolve_dataset_config("kitti.yaml")
+
+    assert Path(resolved) == kitti_yaml.resolve()
+    assert default_kitti_yaml() == kitti_yaml
