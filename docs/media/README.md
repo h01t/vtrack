@@ -3,8 +3,8 @@
 Tracked, lightweight assets used by the public README:
 
 - `hero-poster.png` — poster frame for the README hero
-- `tracking-frame.png` — persistent IDs and trails
-- `analytics-frame.png` — line-counter / analytics overlay
+- `tracking-frame.png` — boxes + motion trails only (no tripwire)
+- `analytics-frame.png` — tripwire counting line + summary panel
 - `benchmark-trackers.svg` — CUDA FP16 tracker comparison (from `benchmark-cuda.csv`)
 - `benchmark-cuda.csv` — CUDA latency card (trackers × half, plus pretrained `yolo11s.pt` contrast)
 - `benchmark.csv` — legacy CPU snapshot (kept for historical regression experiments)

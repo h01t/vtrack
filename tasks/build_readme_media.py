@@ -28,8 +28,11 @@ BENCHMARK_WARMUP_FRAMES = 30
 DEMO_MIN_CONFIDENCE = 0.25
 DEMO_TRACK_CONFIDENCE = 0.10
 DEMO_DURATION_SEC = 10.0
+# Longer trails so a single still clearly shows motion paths.
+TRACKING_TRACE_LENGTH = 90
 DEFAULT_SEGMENT_START_SEC = 3.0
 DEFAULT_SEGMENT_DURATION_SEC = 12.0
+README_STILL_WIDTH = 960
 README_VIDEO_URL = "https://github.com/h01t/vtrack/releases/download/media/demo-short.mp4"
 
 
@@ -223,6 +226,16 @@ def compose_demo_video(
         )
 
 
+def resize_still(frame: np.ndarray, *, width: int = README_STILL_WIDTH) -> np.ndarray:
+    """Resize a still for README display without letterbox blur bars."""
+    height, current_width = frame.shape[:2]
+    if current_width == width:
+        return frame
+    out_height = max(2, int(round(height * (width / current_width))))
+    out_height -= out_height % 2
+    return cv2.resize(frame, (width, out_height), interpolation=cv2.INTER_AREA)
+
+
 def extract_frame(video_path: Path, *, fraction: float) -> np.ndarray:
     capture = cv2.VideoCapture(str(video_path))
     if not capture.isOpened():
@@ -333,7 +346,8 @@ def build_demo_assets(args: argparse.Namespace) -> None:
     with tempfile.TemporaryDirectory(prefix="vtrack-readme-media-") as temp_dir_raw:
         temp_dir = Path(temp_dir_raw)
         source_segment = temp_dir / "source-segment.mp4"
-        annotated_video = temp_dir / "annotated-full.mp4"
+        tracking_video = temp_dir / "annotated-tracking.mp4"
+        analytics_video = temp_dir / "annotated-analytics.mp4"
         frames_csv = temp_dir / "frames.csv"
         summary_json = temp_dir / "summary.json"
 
@@ -346,34 +360,47 @@ def build_demo_assets(args: argparse.Namespace) -> None:
 
         segment_info = probe_video(source_segment)
         line_zone = build_line_zone(segment_info)
-        analytics = VehicleAnalytics(line_zone=line_zone)
-        inference = InferenceConfig(
+        base_inference = InferenceConfig(
             model_path=str(model_path),
             min_confidence=DEMO_MIN_CONFIDENCE,
             track_conf=DEMO_TRACK_CONFIDENCE,
             tracker=DEMO_TRACKER,
             device="cuda",
+            trace_length=TRACKING_TRACE_LENGTH,
         )
+
+        # Pass 1: boxes + trails only (Visual Tour "Tracking + Trails").
         run_demo(
             source=source_segment,
-            inference=inference,
+            inference=base_inference,
+            analytics=None,
+            display=False,
+            save_path=str(tracking_video),
+        )
+
+        # Pass 2: tripwire + summary panel (Visual Tour "Analytics Overlay" + demo MP4).
+        analytics = VehicleAnalytics(line_zone=line_zone)
+        run_demo(
+            source=source_segment,
+            inference=base_inference,
             analytics=analytics,
             display=False,
-            save_path=str(annotated_video),
+            save_path=str(analytics_video),
             export_csv=str(frames_csv),
             export_json=str(summary_json),
         )
 
         demo_short = out_dir / "demo-short.mp4"
         compose_demo_video(
-            annotated_video=annotated_video,
+            annotated_video=analytics_video,
             destination=demo_short,
             crop_top_ratio=args.scene_crop_top_ratio,
         )
 
-        hero_frame = extract_frame(demo_short, fraction=0.45)
-        tracking_frame = extract_frame(demo_short, fraction=0.68)
-        analytics_frame = extract_frame(demo_short, fraction=0.82)
+        # Stills come from each pass so the two README columns are visually distinct.
+        tracking_frame = resize_still(extract_frame(tracking_video, fraction=0.72))
+        analytics_frame = resize_still(extract_frame(analytics_video, fraction=0.78))
+        hero_frame = resize_still(extract_frame(analytics_video, fraction=0.45))
 
         hero_poster = out_dir / "hero-poster.png"
         tracking_poster = out_dir / "tracking-frame.png"

@@ -1,4 +1,4 @@
 tracker,tracker_path,requested_tracker,device,imgsz,vid_stride,frames_processed,timed_frames,wall_time_sec,avg_fps,median_fps,p95_frame_ms,unique_tracks,avg_track_duration_frames,median_track_duration_frames,short_tracks_lt_5_frames,short_tracks_lt_15_frames,per_class_counts,line_crossings_in,line_crossings_out,zone_current_count
-bytetrack,/home/tron/projects/vtrack/src/vtrack/trackers/bytetrack.yaml,bytetrack,cpu,640,1,150,120,4.001213,36.528,34.71,30.287,14,43.857,32.5,3,4,"{""car"": 13, ""misc"": 1}",2,0,0
-bytetrack-occlusion,/home/tron/projects/vtrack/src/vtrack/trackers/bytetrack-occlusion.yaml,bytetrack-occlusion,cpu,640,1,150,120,3.736058,41.009,45.183,29.898,16,38.25,32.5,6,6,"{""car"": 15, ""misc"": 1}",2,0,0
-botsort,/home/tron/projects/vtrack/src/vtrack/trackers/botsort.yaml,botsort,cpu,640,1,150,120,4.395411,34.182,34.161,30.845,15,40.533,25.0,2,4,"{""car"": 14, ""misc"": 1}",2,0,0
+bytetrack,/home/tron/projects/vtrack/src/vtrack/trackers/bytetrack.yaml,bytetrack,cpu,640,1,150,120,3.667597,41.959,45.42,30.047,14,43.857,32.5,3,4,"{""car"": 13, ""misc"": 1}",2,0,0
+bytetrack-occlusion,/home/tron/projects/vtrack/src/vtrack/trackers/bytetrack-occlusion.yaml,bytetrack-occlusion,cpu,640,1,150,120,4.040661,37.344,35.048,30.247,16,38.25,32.5,6,6,"{""car"": 15, ""misc"": 1}",2,0,0
+botsort,/home/tron/projects/vtrack/src/vtrack/trackers/botsort.yaml,botsort,cpu,640,1,150,120,4.467498,33.628,34.122,33.905,15,40.533,25.0,2,4,"{""car"": 14, ""misc"": 1}",2,0,0

@@ -40,7 +40,7 @@ graph TD
 | Tracking + Trails | Analytics Overlay |
 |-------------------|-------------------|
 | ![Tracking frame](docs/media/tracking-frame.png) | ![Analytics frame](docs/media/analytics-frame.png) |
-| Persistent IDs and trace lines make it easy to follow vehicles through the scene. | A tripwire counting line increments **in/out** when a track centroid crosses; the panel shows unique IDs and crossings. |
+| Persistent IDs and motion trails follow each vehicle through the scene. | A tripwire counting line increments **in/out** when a track centroid crosses; the panel shows unique IDs and crossings. |
 
 ## Why This Stack
 

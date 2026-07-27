@@ -17,7 +17,7 @@ class Visualizer:
         self.box_annotator = sv.BoxAnnotator(thickness=2)
         self.label_annotator = sv.LabelAnnotator(text_scale=0.5, text_padding=5)
         self.trace_annotator = sv.TraceAnnotator(
-            thickness=2, trace_length=trace_length
+            thickness=3, trace_length=trace_length
         )
 
         # FPS tracking
