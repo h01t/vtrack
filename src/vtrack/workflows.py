@@ -287,3 +287,87 @@ def run_remote_training(
         remote=remote,
     )
     run_remote_training_commands(commands)
+
+
+def run_export_onnx(
+    *,
+    model_path: str | Path,
+    paths: ProjectPaths,
+    imgsz: int = 640,
+    output: str | Path | None = None,
+) -> Path:
+    """Export a checkpoint to ONNX and mirror it under the host checkpoint dir."""
+    import shutil
+
+    paths.ensure_runtime_dirs()
+    source = Path(model_path)
+    model = YOLO(str(source))
+    export_result = model.export(format="onnx", imgsz=imgsz)
+    exported = Path(str(export_result))
+    if not exported.is_file():
+        raise FileNotFoundError(f"ONNX export did not produce a file: {export_result}")
+
+    target = Path(output) if output is not None else paths.models_dir / f"{source.stem}.onnx"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if exported.resolve() != target.resolve():
+        shutil.copy2(exported, target)
+
+    mirror_root = checkpoint_dir()
+    mirror_root.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(target, mirror_root / target.name)
+    return target.resolve()
+
+
+def run_export_benchmark(
+    *,
+    source: str | Path | int,
+    pt_model: str | Path,
+    onnx_model: str | Path,
+    device: str = "cuda",
+    imgsz: int = 640,
+    max_frames: int = 150,
+    warmup_frames: int = 30,
+) -> dict[str, Any]:
+    """Compare frame latency for a .pt checkpoint vs an ONNX export."""
+    import time
+
+    from vtrack.benchmarking import _p95
+
+    def _time_model(model_path: str | Path) -> dict[str, Any]:
+        model = YOLO(str(model_path))
+        latencies_ms: list[float] = []
+        frames = 0
+        iterator = iter(
+            model.predict(
+                source=source,
+                stream=True,
+                device=device,
+                imgsz=imgsz,
+                verbose=False,
+            )
+        )
+        while frames < max_frames:
+            frame_start = time.perf_counter()
+            try:
+                next(iterator)
+            except StopIteration:
+                break
+            elapsed_ms = (time.perf_counter() - frame_start) * 1000.0
+            frames += 1
+            if frames > warmup_frames:
+                latencies_ms.append(elapsed_ms)
+        timed = len(latencies_ms)
+        return {
+            "model": str(model_path),
+            "frames_processed": frames,
+            "timed_frames": timed,
+            "avg_fps": round(timed / (sum(latencies_ms) / 1000.0), 3) if latencies_ms else 0.0,
+            "p95_frame_ms": round(_p95(latencies_ms), 3),
+            "device": device,
+            "imgsz": imgsz,
+        }
+
+    return {
+        "pytorch": _time_model(pt_model),
+        "onnx": _time_model(onnx_model),
+    }

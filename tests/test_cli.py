@@ -106,6 +106,38 @@ def test_train_parser_defaults_to_cuda() -> None:
     assert "Legacy" in root_help
 
 
+def test_export_onnx_parser_defaults() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["export-onnx", "--model", "models/best.pt"])
+
+    assert args.model == "models/best.pt"
+    assert args.imgsz == 640
+    assert args.output is None
+
+
+def test_benchmark_export_parser() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "benchmark-export",
+            "data/test-video.mp4",
+            "--pt-model",
+            "models/best.pt",
+            "--onnx-model",
+            "models/best.onnx",
+            "--device",
+            "cuda",
+            "--max-frames",
+            "50",
+        ]
+    )
+
+    assert args.source == "data/test-video.mp4"
+    assert args.pt_model == "models/best.pt"
+    assert args.onnx_model == "models/best.onnx"
+    assert args.max_frames == 50
+
+
 def test_demo_wrapper_delegates_to_cli() -> None:
     completed = run_command([sys.executable, "scripts/demo.py", "--help"])
 

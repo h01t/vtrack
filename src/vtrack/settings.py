@@ -69,7 +69,7 @@ def normalize_remote_dir(
 ) -> str:
     """Normalize remote directories while preserving remote-home semantics.
 
-    Shell exports like `VTRACK_REMOTE_DIR=~/object-det` expand locally before Python
+    Shell exports like `VTRACK_REMOTE_DIR=~/vtrack` expand locally before Python
     sees them. If the resulting path lives under the local home directory, convert it
     back to a `~/...` path so the remote shell resolves it relative to the remote home.
     """
@@ -332,7 +332,7 @@ class RemoteConfig:
         cls,
         env: Mapping[str, str] | None = None,
         *,
-        project_name: str = "object-det",
+        project_name: str = "vtrack",
         project_root: Path | None = None,
     ) -> "RemoteConfig":
         data = os.environ if env is None else env

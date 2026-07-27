@@ -1,0 +1,8 @@
+model,tracker,device,half,imgsz,frames_processed,timed_frames,avg_fps,median_fps,p95_frame_ms,peak_vram_mb,unique_tracks,avg_track_duration_frames,short_tracks_lt_5_frames
+best.pt,bytetrack,cuda,False,640,150,120,240.072,241.657,4.349,469.0,14,44.286,3
+best.pt,bytetrack-occlusion,cuda,False,640,150,120,237.151,238.127,4.432,469.0,16,38.062,4
+best.pt,botsort,cuda,False,640,150,120,83.936,84.701,12.689,469.0,14,43.929,2
+best.pt,bytetrack,cuda,True,640,150,120,224.573,226.15,4.931,447.0,14,44.286,3
+best.pt,bytetrack-occlusion,cuda,True,640,150,120,225.45,227.467,4.696,447.0,17,35.647,5
+best.pt,botsort,cuda,True,640,150,120,82.205,82.268,12.842,447.0,13,47.846,2
+yolo11s.pt,bytetrack,cuda,True,640,150,120,217.879,220.723,4.953,477.0,12,66.833,1

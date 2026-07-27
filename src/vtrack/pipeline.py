@@ -62,7 +62,13 @@ class VehiclePipeline:
         if self.analytics:
             self.analytics.class_names = class_names
             if self.analytics.line_zone is not None:
-                self.line_zone_annotator = sv.LineZoneAnnotator(thickness=2, text_scale=0.5)
+                # Labels explain the classic traffic tripwire: direction of crossing.
+                self.line_zone_annotator = sv.LineZoneAnnotator(
+                    thickness=2,
+                    text_scale=0.5,
+                    custom_in_text="IN",
+                    custom_out_text="OUT",
+                )
             if self.analytics.polygon_zone is not None:
                 self.polygon_zone_annotator = sv.PolygonZoneAnnotator(
                     zone=self.analytics.polygon_zone,

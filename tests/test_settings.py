@@ -46,10 +46,10 @@ def test_remote_config_prefers_environment_values() -> None:
 
 
 def test_remote_config_defaults_remote_dir_from_project_name() -> None:
-    config = RemoteConfig.from_env({}, project_name="object-det")
+    config = RemoteConfig.from_env({})
 
     assert config.host is None
-    assert config.remote_dir == "~/object-det"
+    assert config.remote_dir == "~/vtrack"
     assert config.datasets_dir == "~/datasets"
     assert config.remote_python == "python3"
 

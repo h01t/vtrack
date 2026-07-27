@@ -27,7 +27,8 @@ dev = [
 ]
 export = [
     "onnx>=1.16",
-    "onnxruntime>=1.18",
+    # 1.28+ currently ships win_amd64-only wheels; 1.27 provides CUDA EP on Linux.
+    "onnxruntime-gpu==1.27.0",
 ]
 
 [project.scripts]

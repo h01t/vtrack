@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 
 from vtrack.cli_handlers import (
+    cmd_benchmark_export,
     cmd_benchmark_track,
     cmd_demo,
     cmd_detect_image,
     cmd_detect_video,
     cmd_evaluate,
+    cmd_export_onnx,
     cmd_train,
     cmd_train_remote,
 )
@@ -61,7 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--save", default=None, help="Output video path (e.g. outputs/demo.mp4)")
     demo.add_argument("--no-display", action="store_true", help="Disable live display window")
     demo.add_argument("--analytics", action="store_true", help="Enable vehicle analytics")
-    demo.add_argument("--line", type=str, default=None, help="Counting line as x1,y1,x2,y2")
+    demo.add_argument(
+        "--line",
+        type=str,
+        default=None,
+        help="Tripwire counting line as x1,y1,x2,y2 (increments in/out on centroid crossings)",
+    )
     demo.add_argument("--zone", type=str, default=None, help="Monitoring zone polygon as x1,y1,...")
     demo.add_argument("--export-csv", default=None, help="Export per-frame data to CSV")
     demo.add_argument("--export-json", default=None, help="Export summary to JSON")
@@ -225,6 +232,32 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--baseline", default="yolo11n.pt", help="Baseline model for comparison")
     evaluate.add_argument("--compare", action="store_true", help="Also evaluate the baseline model")
     evaluate.set_defaults(handler=cmd_evaluate)
+
+    export_onnx = subparsers.add_parser(
+        "export-onnx",
+        help="Export a checkpoint to ONNX (requires uv sync --extra export)",
+    )
+    export_onnx.add_argument("--model", default="models/best.pt", help="Source weights")
+    export_onnx.add_argument("--imgsz", type=int, default=640, help="Export image size")
+    export_onnx.add_argument(
+        "--output",
+        default=None,
+        help="Destination .onnx path (default: models/<stem>.onnx)",
+    )
+    export_onnx.set_defaults(handler=cmd_export_onnx)
+
+    benchmark_export = subparsers.add_parser(
+        "benchmark-export",
+        help="Compare PyTorch .pt vs ONNX Runtime frame latency",
+    )
+    benchmark_export.add_argument("source", help="Video file or camera index")
+    benchmark_export.add_argument("--pt-model", default="models/best.pt")
+    benchmark_export.add_argument("--onnx-model", default="models/best.onnx")
+    benchmark_export.add_argument("--device", default="cuda")
+    benchmark_export.add_argument("--imgsz", type=int, default=640)
+    benchmark_export.add_argument("--max-frames", type=int, default=150)
+    benchmark_export.add_argument("--warmup-frames", type=int, default=30)
+    benchmark_export.set_defaults(handler=cmd_benchmark_export)
 
     train_remote = subparsers.add_parser(
         "train-remote",

@@ -158,10 +158,11 @@ def trim_source_segment(
 def build_line_zone(info: VideoInfo):
     import supervision as sv
 
-    line_y = int(info.height * 0.62)
+    # Mid-road tripwire: vehicles crossing increment in/out by travel direction.
+    line_y = int(info.height * 0.55)
     return sv.LineZone(
-        start=sv.Point(int(info.width * 0.15), line_y),
-        end=sv.Point(int(info.width * 0.85), line_y),
+        start=sv.Point(int(info.width * 0.10), line_y),
+        end=sv.Point(int(info.width * 0.90), line_y),
     )
 
 
@@ -351,6 +352,7 @@ def build_demo_assets(args: argparse.Namespace) -> None:
             min_confidence=DEMO_MIN_CONFIDENCE,
             track_conf=DEMO_TRACK_CONFIDENCE,
             tracker=DEMO_TRACKER,
+            device="cuda",
         )
         run_demo(
             source=source_segment,

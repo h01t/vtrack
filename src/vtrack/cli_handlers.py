@@ -144,3 +144,33 @@ def cmd_train_remote(args: argparse.Namespace) -> int:
     print(f"Remote training completed for run '{training.name}'.")
     print(f"Synced artifacts: {paths.train_artifacts_dir / training.name}")
     return 0
+
+
+def cmd_export_onnx(args: argparse.Namespace) -> int:
+    from vtrack.workflows import run_export_onnx
+
+    paths = ProjectPaths()
+    target = run_export_onnx(
+        model_path=args.model,
+        paths=paths,
+        imgsz=args.imgsz,
+        output=args.output,
+    )
+    print(f"ONNX export written to {target}")
+    return 0
+
+
+def cmd_benchmark_export(args: argparse.Namespace) -> int:
+    from vtrack.workflows import run_export_benchmark
+
+    report = run_export_benchmark(
+        source=parse_source(args.source),
+        pt_model=args.pt_model,
+        onnx_model=args.onnx_model,
+        device=args.device,
+        imgsz=args.imgsz,
+        max_frames=args.max_frames,
+        warmup_frames=args.warmup_frames,
+    )
+    print(json.dumps(report, indent=2))
+    return 0

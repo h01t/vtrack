@@ -2,7 +2,7 @@
 
 End-to-end vehicle detection, multi-object tracking, and analytics pipeline built on YOLOv11 and fine-tuned on the KITTI dataset.
 
-> **Academic Project Note:** This repository is a portfolio and academic demonstration built for vehicle detection and tracking. It is intended to show reproducible ML engineering, model evaluation, serving, and monitoring patterns rather than represent a production traffic analytics system.
+> **Portfolio / PoC note:** This repository is an end-to-end ML demonstration — dataset → fine-tune → eval → tracking → analytics → artifact publishing on a consumer GPU. It is not a production traffic analytics product.
 <p align="center">
   <a href="https://github.com/h01t/vtrack/releases/download/media/demo-short.mp4">
     <img src="docs/media/hero-poster.png" alt="vtrack demo poster" width="100%">
@@ -40,7 +40,7 @@ graph TD
 | Tracking + Trails | Analytics Overlay |
 |-------------------|-------------------|
 | ![Tracking frame](docs/media/tracking-frame.png) | ![Analytics frame](docs/media/analytics-frame.png) |
-| Persistent IDs and trace lines make it easy to follow vehicles through the scene. | A counting line and summary panel turn the tracker into a lightweight traffic analytics view. |
+| Persistent IDs and trace lines make it easy to follow vehicles through the scene. | A tripwire counting line increments **in/out** when a track centroid crosses; the panel shows unique IDs and crossings. |
 
 ## Why This Stack
 
@@ -49,20 +49,20 @@ graph TD
 | **Detection** | YOLOv11 (Ultralytics) | State-of-the-art single-stage detector. Ultralytics provides a clean Python API with built-in training, validation, export, and tracker integration — no glue code needed. |
 | **Tracking** | ByteTrack (via Ultralytics) | Lightweight, high-performance multi-object tracker that handles occlusion well. Ships with Ultralytics, so `model.track()` is a one-liner with `persist=True` for frame-to-frame ID persistence. |
 | **Visualization** | supervision (Roboflow) | Purpose-built for CV annotation overlays. Provides `BoxAnnotator`, `TraceAnnotator`, `LineZone`, `PolygonZone` out of the box — significantly less boilerplate than raw OpenCV drawing. |
-| **Dataset** | KITTI | Well-established autonomous driving benchmark with 7,481 annotated images and 8 vehicle-relevant classes. Auto-downloads via Ultralytics, no manual setup. |
-| **Training hardware** | NVIDIA 3060 Ti (remote CUDA) | Apple Silicon MPS has known PyTorch bugs in the YOLO task assigner (`index out of bounds`). Remote CUDA training on a 3060 Ti (8GB VRAM) completed 50 epochs in ~28 minutes vs. an estimated ~18 hours on CPU. |
+| **Dataset** | KITTI | Well-established autonomous driving benchmark with 7,481 annotated images and 8 vehicle-relevant classes. Hosted under `/srv/ai/datasets/kitti` on blackbox. |
+| **Training hardware** | NVIDIA GeForce RTX 3060 Ti (8 GiB) | Local CUDA on **blackbox**. 50 epochs completed in ~28 minutes. MPS training is unsupported (PyTorch YOLO task-assigner bug). |
 | **Environment** | uv + Python 3.12 | Fast dependency resolution, lockfile support, and no need for conda. |
 
 ## Model Results
 
-**Fine-tuned YOLOv11n on KITTI (50 epochs, 3060 Ti CUDA)**
+**Fine-tuned YOLOv11n on KITTI (50 epochs, blackbox 3060 Ti CUDA)** — from `artifacts/train/vehicle_v1/summary.json`
 
 | Metric | Value |
 |--------|-------|
 | mAP@0.5 | **0.850** |
-| mAP@0.5:0.95 | 0.602 |
-| Precision | 0.854 |
-| Recall | 0.791 |
+| mAP@0.5:0.95 | 0.608 |
+| Precision | 0.865 |
+| Recall | 0.761 |
 | Training time | ~28 minutes |
 | Model size | 5.4 MB |
 
@@ -70,22 +70,36 @@ graph TD
 
 | Class | mAP@0.5 |
 |-------|---------|
-| Car | 0.927 |
-| Van | 0.854 |
-| Truck | 0.880 |
-| Pedestrian | 0.814 |
-| Person sitting | 0.668 |
-| Cyclist | 0.882 |
-| Tram | 0.954 |
-| Misc | 0.824 |
+| Car | 0.958 |
+| Van | 0.929 |
+| Truck | 0.953 |
+| Pedestrian | 0.772 |
+| Person sitting | 0.575 |
+| Cyclist | 0.815 |
+| Tram | 0.945 |
+| Misc | 0.854 |
 
-The pretrained COCO model scored mAP@0.5 of 0.022 on KITTI due to class ID mismatch — fine-tuning gave a **39x improvement**.
+The pretrained COCO model scored mAP@0.5 of 0.022 on KITTI due to class ID mismatch — fine-tuning gave a **~39x improvement**.
 
-## Tracker Benchmark Snapshot
+## CUDA Performance
+
+Latency on blackbox **RTX 3060 Ti** using a 150-frame continuous traffic clip (`data/test-video.mp4`). Full rows: [`docs/media/benchmark-cuda.csv`](docs/media/benchmark-cuda.csv). Chart below uses fine-tuned `best.pt` with `--half`.
+
+| Model | Tracker | half | Avg FPS | p95 ms | Peak VRAM |
+|-------|---------|------|---------|--------|-----------|
+| best.pt (YOLOv11n KITTI) | bytetrack | false | 240.1 | 4.3 | 469 MiB |
+| best.pt | bytetrack-occlusion | false | 237.2 | 4.4 | 469 MiB |
+| best.pt | botsort | false | 83.9 | 12.7 | 469 MiB |
+| best.pt | bytetrack | true | 224.6 | 4.9 | 447 MiB |
+| best.pt | bytetrack-occlusion | true | 225.5 | 4.7 | 447 MiB |
+| best.pt | botsort | true | 82.2 | 12.9 | 447 MiB |
+| yolo11s.pt (COCO pretrained) | bytetrack | true | 217.9 | 5.0 | 477 MiB |
+
+BoT-SORT is slower than ByteTrack because of CPU-side GMC (`sparseOptFlow`). Half precision mainly reduces VRAM on this short clip; ByteTrack FPS stays in the same band.
 
 ![Tracker benchmark snapshot](docs/media/benchmark-trackers.svg)
 
-This snapshot comes from `vtrack benchmark-track` on the fine-tuned model using a fixed short clip and CPU inference for repeatability. Exact generation commands, source provenance, and the backing CSV live in [docs/media/README.md](docs/media/README.md).
+Reproduce: `uv run python tasks/cuda_perf_card.py`. Clip provenance: [docs/media/README.md](docs/media/README.md).
 
 ## Project Structure
 
@@ -129,7 +143,7 @@ uv sync --extra dev   # recommended for pytest + ruff
 # Run with fine-tuned KITTI model (CUDA)
 uv run vtrack demo data/test-video.mp4 --model models/best.pt --device cuda
 
-# Enable analytics with a counting line
+# Enable analytics with a counting line (tripwire: in/out crossings)
 uv run vtrack demo data/test-video.mp4 \
     --model models/best.pt \
     --device cuda \
@@ -179,6 +193,8 @@ commands:
   detect-video          Detection-only video pass
   train                 Local CUDA training (primary on blackbox)
   evaluate              Local evaluation and optional baseline comparison
+  export-onnx           Export checkpoint to ONNX
+  benchmark-export      Compare .pt vs ONNX Runtime latency
   train-remote          Legacy remote push/train/pull helper
 
 See `uv run vtrack <command> --help` for subcommand-specific options.
@@ -254,6 +270,30 @@ uv run vtrack evaluate \
 
 `train-remote` remains for Mac→SSH push workflows but is no longer the happy path. Prefer local `vtrack train` on blackbox.
 
+## Deploy (ONNX)
+
+Thin export + latency compare on blackbox (no public bind; run locally or via Remote SSH):
+
+```bash
+uv sync --extra export
+
+uv run vtrack export-onnx --model models/best.pt --imgsz 640
+# → models/best.onnx (+ mirror under /srv/ai/checkpoints/vtrack/)
+
+uv run vtrack benchmark-export data/test-video.mp4 \
+  --pt-model models/best.pt \
+  --onnx-model models/best.onnx \
+  --device cuda \
+  --max-frames 150
+```
+
+| Runtime | Model | Avg FPS | p95 ms | Notes |
+|---------|-------|---------|--------|-------|
+| PyTorch CUDA | `models/best.pt` | 326.2 | 3.3 | Ultralytics predict stream |
+| ONNX Runtime CUDA EP | `models/best.onnx` | 247.0 | 4.3 | `onnxruntime-gpu==1.27.0` |
+
+ONNX is the portable deploy artifact for this PoC. TensorRT / CoreML / edge boards are deferred.
+
 ## Artifacts
 
 - Normalized bundles are written to `artifacts/train/<run-name>/` and `artifacts/eval/<run-name>/`.
@@ -267,41 +307,42 @@ uv run vtrack evaluate \
 ```bash
 # Install project + dev tools
 uv sync --extra dev
+uv sync --extra export   # ONNX export / ORT compare
 
-# Lint and tests
+# Lint and tests (matches CI; smoke excluded)
 uv run ruff check src scripts tests
-uv run pytest
+uv run pytest -m "not smoke"
 
-# Opt-in smoke evaluation against local assets
+# Opt-in smoke evaluation against local assets (GPU/weights/dataset)
 VTRACK_RUN_SMOKE=1 uv run pytest -m smoke
 ```
 
-## Use Cases
+GitHub Actions runs the same non-smoke lint/test gate on PRs and `main`.
 
-- **Traffic monitoring** — Count vehicles crossing a line or occupying a zone at intersections, highway ramps, or parking entrances
-- **Autonomous driving R&D** — Validate perception models on KITTI-style driving footage
-- **Parking lot management** — Monitor occupancy by vehicle type (car vs. truck vs. van)
-- **Urban planning** — Collect traffic flow data (volume, composition, peak times) from existing camera infrastructure
-- **Security/surveillance** — Track vehicle movement patterns, detect unusual behavior (wrong-way driving, prolonged stops)
-- **Fleet management** — Count and classify vehicles entering/exiting depots or loading docks
+## PoC status
 
-## Implementation Progress (Phased Hardening Plan)
-
+- [x] KITTI fine-tune on blackbox CUDA with published metrics + artifact bundles
+- [x] Tracking + analytics CLI (`demo`, `benchmark-track`)
+- [x] CUDA latency card + README media from continuous traffic footage
+- [x] ONNX export path + `.pt` vs ONNX Runtime FPS/VRAM compare
+- [x] CI: ruff + non-smoke pytest
+- [ ] Formal MOTA/HOTA
+- [ ] Localhost inference API
+- [ ] Dashcam / fixed-camera continuous video
 
 ## Reliability & Local Quality Tooling
 
 - Troubleshooting guide: [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Local hardening architecture notes: [`docs/architecture-local-hardening.md`](docs/architecture-local-hardening.md)
-- Benchmark regression checker script: [`tasks/benchmark_regression.py`](tasks/benchmark_regression.py)
+- Benchmark regression checker: [`tasks/benchmark_regression.py`](tasks/benchmark_regression.py)
+- CUDA perf card driver: [`tasks/cuda_perf_card.py`](tasks/cuda_perf_card.py)
 
 ### Benchmark regression check
 
-Use this helper to compare a current benchmark CSV against a baseline and fail when configured latency/FPS thresholds regress.
-
 ```bash
 uv run python tasks/benchmark_regression.py \
-  --current docs/media/benchmark.csv \
-  --baseline docs/media/benchmark.csv \
+  --current docs/media/benchmark-cuda.csv \
+  --baseline docs/media/benchmark-cuda.csv \
   --max-fps-regression-pct 15 \
   --max-p95-increase-pct 20 \
   --max-median-increase-pct 20
@@ -310,23 +351,18 @@ uv run python tasks/benchmark_regression.py \
 ## Future Improvements
 
 ### Near-term
-- **Real continuous video testing** — Current validation is on KITTI stills stitched into clips. Test on dashcam and fixed-camera footage for real-world tracking performance.
-- **Continuous tracker benchmarks** — Run `benchmark-track` on longer traffic footage with `--device cuda` and record ByteTrack vs. BoT-SORT comparisons.
-- **Formal MOT evaluation** — Add MOT-style ground-truth scoring (ID switches, MOTA/HOTA) on annotated video sequences.
-- **FPS benchmarks** — Profile YOLOv11n vs. YOLOv11s on the blackbox 3060 Ti (and optionally Apple Silicon inference-only).
+- **Formal MOT evaluation** — MOTA/HOTA/IDF1 on an annotated sequence.
+- **Longer CUDA benchmarks** — Multi-minute clips and YOLOv11s fine-tune (this PoC contrasts pretrained `yolo11s.pt` only).
 
-### Edge deployment
-- **ONNX export** — For cross-platform CPU inference via ONNX Runtime.
-- **CoreML export** — Optional Apple Silicon inference path (macOS/iOS).
-- **Raspberry Pi** — TFLite or NCNN for embedded deployment, continuing from prior thesis work.
-- **Quantization** — INT8 quantization for 2-4x speedup on edge devices.
+### Deploy / edge (someday)
+- **TensorRT** — Optional NVIDIA-optimized path beyond ONNX Runtime.
+- **Raspberry Pi** — TFLite or NCNN on constrained hardware.
+- **INT8 quantization** — Further edge speedups.
 
-### Platform evolution
-- **Web dashboard** — Real-time streaming with live analytics (FastAPI + React).
-- **Multi-camera support** — Aggregate analytics across multiple video sources.
-- **Re-identification** — Match vehicles across non-overlapping camera views.
-- **Custom dataset training** — CVAT/Label Studio integration for annotation → training → deployment loop.
-- **Autonomous training platform** — LLM-driven self-correcting training loop (see PLATFORM.md for the full concept).
+### Explicitly deferred
+- Localhost / web inference API
+- Multi-camera aggregation and re-identification
+- Autonomous AutoTrain-style loops as a product surface
 
 ## Dependencies
 
@@ -338,7 +374,7 @@ supervision>=0.25   # CV visualization and zone utilities
 lapx>=0.5           # Linear assignment for tracking
 ```
 
-Optional: `onnx`, `onnxruntime` for model export.
+Optional (`uv sync --extra export`): `onnx`, `onnxruntime-gpu==1.27.0` for ONNX export and CUDA EP compare.
 
 ## License
 

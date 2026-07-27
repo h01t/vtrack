@@ -142,7 +142,10 @@ class VehicleAnalytics:
             panel_lines.append(f"  {name}: {count}")
 
         if self.line_zone is not None:
-            panel_lines.append(f"In: {self.line_in_count} | Out: {self.line_out_count}")
+            panel_lines.append("Line crossings")
+            panel_lines.append(
+                f"  in: {self.line_in_count}  out: {self.line_out_count}"
+            )
 
         if self.polygon_zone is not None:
             panel_lines.append(f"In zone: {self.zone_current_count}")
@@ -150,7 +153,7 @@ class VehicleAnalytics:
         # Draw panel background
         line_height = 25
         panel_h = len(panel_lines) * line_height + 10
-        panel_w = 200
+        panel_w = 220
         x0 = w - panel_w - 10
         y0 = 10
 
