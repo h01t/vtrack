@@ -174,3 +174,43 @@ def cmd_benchmark_export(args: argparse.Namespace) -> int:
     )
     print(json.dumps(report, indent=2))
     return 0
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    from vtrack.api import run_server
+    from vtrack.settings import InferenceConfig
+
+    run_server(
+        inference=InferenceConfig(
+            model_path=args.model,
+            min_confidence=args.conf,
+            track_conf=args.conf,
+            tracker=args.tracker,
+            device=args.device,
+            imgsz=args.imgsz,
+            half=args.half,
+        ),
+        host=args.host,
+        port=args.port,
+    )
+    return 0
+
+
+def cmd_evaluate_mot(args: argparse.Namespace) -> int:
+    from vtrack.workflows import run_mot17_evaluation
+
+    paths = ProjectPaths()
+    report = run_mot17_evaluation(
+        dataset_root=args.dataset_root,
+        model_path=args.model,
+        tracker=args.tracker,
+        device=args.device,
+        imgsz=args.imgsz,
+        conf=args.conf,
+        sequences=args.sequences,
+        max_frames=args.max_frames,
+        name=args.name,
+        paths=paths,
+    )
+    print(json.dumps(report, indent=2))
+    return 0

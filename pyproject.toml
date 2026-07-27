@@ -24,11 +24,22 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.9",
     "ipython>=8.0",
+    "httpx>=0.27",
 ]
 export = [
     "onnx>=1.16",
     # 1.28+ currently ships win_amd64-only wheels; 1.27 provides CUDA EP on Linux.
     "onnxruntime-gpu==1.27.0",
+]
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27",
+]
+mot = [
+    "trackeval @ git+https://github.com/JonathonLuiten/TrackEval.git",
+    "huggingface-hub>=0.26",
 ]
 
 [project.scripts]

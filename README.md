@@ -81,6 +81,24 @@ graph TD
 
 The pretrained COCO model scored mAP@0.5 of 0.022 on KITTI due to class ID mismatch — fine-tuning gave a **~39x improvement**.
 
+## Formal MOT metrics (MOT17)
+
+Methodology proof on **MOTChallenge MOT17** pedestrian tracks (not vehicle/KITTI). Detector: COCO-pretrained `yolo11n.pt` + ByteTrack. Sequence: `MOT17-02-FRCNN` (600 frames, train split). Not a hidden-test leaderboard submission.
+
+| Metric | Value |
+|--------|-------|
+| HOTA | 0.262 |
+| MOTA | 0.199 |
+| IDF1 | 0.274 |
+
+```bash
+uv sync --extra mot
+uv run python tasks/download_mot17.py --keep-only-poc
+uv run vtrack evaluate-mot --sequences MOT17-02 --model yolo11n.pt --device cuda --name mot17_poc
+```
+
+Artifact summary: `artifacts/eval/mot17_mot17_poc/summary.json`.
+
 ## CUDA Performance
 
 Latency on blackbox **RTX 3060 Ti** using a 150-frame continuous traffic clip (`data/test-video.mp4`). Full rows: [`docs/media/benchmark-cuda.csv`](docs/media/benchmark-cuda.csv). Chart below uses fine-tuned `best.pt` with `--half`.
@@ -193,6 +211,8 @@ commands:
   detect-video          Detection-only video pass
   train                 Local CUDA training (primary on blackbox)
   evaluate              Local evaluation and optional baseline comparison
+  evaluate-mot          MOT17 HOTA/MOTA/IDF1 (TrackEval; person tracks)
+  serve                 Localhost FastAPI detect/track API
   export-onnx           Export checkpoint to ONNX
   benchmark-export      Compare .pt vs ONNX Runtime latency
   train-remote          Legacy remote push/train/pull helper
@@ -270,6 +290,19 @@ uv run vtrack evaluate \
 
 `train-remote` remains for Mac→SSH push workflows but is no longer the happy path. Prefer local `vtrack train` on blackbox.
 
+## Localhost inference API
+
+Thin FastAPI service bound to **127.0.0.1** only (OpenAPI at `/docs`):
+
+```bash
+uv sync --extra api
+uv run vtrack serve --model models/best.pt --device cuda --host 127.0.0.1 --port 8000
+
+curl -s http://127.0.0.1:8000/health
+curl -s -F "file=@path/to/frame.jpg" http://127.0.0.1:8000/v1/detect
+curl -s -F "file=@path/to/frame.jpg" -F "session_id=demo" http://127.0.0.1:8000/v1/track
+```
+
 ## Deploy (ONNX)
 
 Thin export + latency compare on blackbox (no public bind; run locally or via Remote SSH):
@@ -308,6 +341,8 @@ ONNX is the portable deploy artifact for this PoC. TensorRT / CoreML / edge boar
 # Install project + dev tools
 uv sync --extra dev
 uv sync --extra export   # ONNX export / ORT compare
+uv sync --extra api      # localhost FastAPI serve
+uv sync --extra mot      # TrackEval MOT17 metrics
 
 # Lint and tests (matches CI; smoke excluded)
 uv run ruff check src scripts tests
@@ -326,9 +361,9 @@ GitHub Actions runs the same non-smoke lint/test gate on PRs and `main`.
 - [x] CUDA latency card + README media from continuous traffic footage
 - [x] ONNX export path + `.pt` vs ONNX Runtime FPS/VRAM compare
 - [x] CI: ruff + non-smoke pytest
-- [ ] Formal MOTA/HOTA
-- [ ] Localhost inference API
-- [ ] Dashcam / fixed-camera continuous video
+- [x] Formal MOTA/HOTA/IDF1 on MOT17 (person tracks, TrackEval)
+- [x] Localhost inference API (`vtrack serve`, 127.0.0.1)
+- [x] Fixed-camera continuous video (Roboflow highway clip; not dashcam / not KITTI stills)
 
 ## Reliability & Local Quality Tooling
 
@@ -351,8 +386,8 @@ uv run python tasks/benchmark_regression.py \
 ## Future Improvements
 
 ### Near-term
-- **Formal MOT evaluation** — MOTA/HOTA/IDF1 on an annotated sequence.
 - **Longer CUDA benchmarks** — Multi-minute clips and YOLOv11s fine-tune (this PoC contrasts pretrained `yolo11s.pt` only).
+- **Broader MOT17 coverage** — Add MOT17-04/09 once downloaded; keep reporting honest train-split subset metrics.
 
 ### Deploy / edge (someday)
 - **TensorRT** — Optional NVIDIA-optimized path beyond ONNX Runtime.
@@ -360,9 +395,9 @@ uv run python tasks/benchmark_regression.py \
 - **INT8 quantization** — Further edge speedups.
 
 ### Explicitly deferred
-- Localhost / web inference API
 - Multi-camera aggregation and re-identification
 - Autonomous AutoTrain-style loops as a product surface
+- Public internet binding for the inference API (localhost-only by design)
 
 ## Dependencies
 
@@ -374,7 +409,7 @@ supervision>=0.25   # CV visualization and zone utilities
 lapx>=0.5           # Linear assignment for tracking
 ```
 
-Optional (`uv sync --extra export`): `onnx`, `onnxruntime-gpu==1.27.0` for ONNX export and CUDA EP compare.
+Optional extras: `export` (ONNX), `api` (FastAPI serve), `mot` (TrackEval).
 
 ## License
 

@@ -371,3 +371,65 @@ def run_export_benchmark(
         "pytorch": _time_model(pt_model),
         "onnx": _time_model(onnx_model),
     }
+
+
+def run_mot17_evaluation(
+    *,
+    dataset_root: str | Path,
+    model_path: str,
+    tracker: str,
+    device: str | None,
+    imgsz: int,
+    conf: float,
+    sequences: list[str],
+    name: str,
+    paths: ProjectPaths,
+    max_frames: int | None = None,
+) -> dict[str, Any]:
+    """Run MOT17 person tracking evaluation and publish an artifact bundle."""
+    from vtrack.mot_eval import evaluate_mot17
+    from vtrack.settings import output_dir
+
+    validate_inference_device(device)
+    paths.ensure_runtime_dirs()
+    work_dir = output_dir() / "mot17" / name
+    if work_dir.exists():
+        import shutil
+
+        shutil.rmtree(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    report = evaluate_mot17(
+        dataset_root=Path(dataset_root),
+        model_path=model_path,
+        tracker=tracker,
+        device=device,
+        imgsz=imgsz,
+        conf=conf,
+        sequences=sequences,
+        work_dir=work_dir,
+        max_frames=max_frames,
+        tracker_name="vtrack_bytetrack",
+    )
+
+    bundle = publish_artifact_bundle(
+        paths=paths,
+        run_type="eval",
+        run_id=f"mot17_{name}",
+        summary=report,
+        command=[
+            "vtrack",
+            "evaluate-mot",
+            "--dataset-root",
+            str(dataset_root),
+            "--model",
+            model_path,
+            "--name",
+            name,
+        ],
+        raw_output_path=work_dir,
+        dataset_path=str(dataset_root),
+        checkpoint_path=model_path,
+    )
+    report["artifact_bundle"] = str(bundle.bundle_dir)
+    return report

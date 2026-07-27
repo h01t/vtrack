@@ -11,7 +11,9 @@ from vtrack.cli_handlers import (
     cmd_detect_image,
     cmd_detect_video,
     cmd_evaluate,
+    cmd_evaluate_mot,
     cmd_export_onnx,
+    cmd_serve,
     cmd_train,
     cmd_train_remote,
 )
@@ -232,6 +234,48 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--baseline", default="yolo11n.pt", help="Baseline model for comparison")
     evaluate.add_argument("--compare", action="store_true", help="Also evaluate the baseline model")
     evaluate.set_defaults(handler=cmd_evaluate)
+
+    evaluate_mot = subparsers.add_parser(
+        "evaluate-mot",
+        help="MOT17 HOTA/MOTA/IDF1 via TrackEval (requires uv sync --extra mot)",
+    )
+    evaluate_mot.add_argument(
+        "--dataset-root",
+        default="/srv/ai/datasets/mot17",
+        help="MOT17 root containing train/<seq>",
+    )
+    evaluate_mot.add_argument(
+        "--model",
+        default="yolo11n.pt",
+        help="COCO-pretrained weights (person tracks; not KITTI best.pt)",
+    )
+    evaluate_mot.add_argument("--tracker", default="bytetrack")
+    evaluate_mot.add_argument("--device", default="cuda")
+    evaluate_mot.add_argument("--imgsz", type=int, default=640)
+    evaluate_mot.add_argument("--conf", type=float, default=0.25)
+    evaluate_mot.add_argument(
+        "--sequences",
+        nargs="+",
+        default=["MOT17-02"],
+        help="Sequence prefixes (detector suffix -FRCNN/-SDP/-DPM resolved automatically)",
+    )
+    evaluate_mot.add_argument("--max-frames", type=int, default=None)
+    evaluate_mot.add_argument("--name", default="mot17_poc")
+    evaluate_mot.set_defaults(handler=cmd_evaluate_mot)
+
+    serve = subparsers.add_parser(
+        "serve",
+        help="Localhost FastAPI detect/track API (requires uv sync --extra api)",
+    )
+    serve.add_argument("--host", default="127.0.0.1", help="Bind address (loopback only)")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument("--model", default="models/best.pt")
+    serve.add_argument("--device", default="cuda")
+    serve.add_argument("--conf", type=float, default=0.25)
+    serve.add_argument("--imgsz", type=int, default=640)
+    serve.add_argument("--tracker", default="bytetrack")
+    serve.add_argument("--half", action="store_true")
+    serve.set_defaults(handler=cmd_serve)
 
     export_onnx = subparsers.add_parser(
         "export-onnx",

@@ -203,3 +203,40 @@ Two env vars are supported:
 Example:
 ```bash
 VTRACK_LOG_LEVEL=DEBUG VTRACK_LOG_FORMAT=json uv run vtrack demo data/test-video.mp4 --no-display --device cpu
+
+---
+
+## 11) Localhost API failures
+
+### Symptom
+- `uv run vtrack serve` fails with missing FastAPI/uvicorn, or curl cannot connect.
+
+### Cause
+- API extra not installed, non-loopback bind rejected, or port already in use.
+
+### Resolution
+```bash
+uv sync --extra api
+uv run vtrack serve --host 127.0.0.1 --port 8000 --model models/best.pt --device cuda
+curl -s http://127.0.0.1:8000/health
+```
+- Do not bind `0.0.0.0` — the PoC API refuses non-loopback hosts.
+
+---
+
+## 12) MOT17 / TrackEval failures
+
+### Symptom
+- `evaluate-mot` cannot find sequences or TrackEval import fails.
+
+### Cause
+- Dataset missing under `/srv/ai/datasets/mot17`, or `mot` extra not installed.
+
+### Resolution
+```bash
+uv sync --extra mot
+uv run python tasks/download_mot17.py --keep-only-poc
+uv run vtrack evaluate-mot --sequences MOT17-02 --model yolo11n.pt --device cuda
+```
+- MOT numbers use COCO-pretrained `yolo11n.pt` on **person** tracks (MOTChallenge domain), not KITTI `best.pt`.
+- Prefer the Hugging Face mirror in `tasks/download_mot17.py` when motchallenge.net is unreachable.
